@@ -39,6 +39,7 @@ its own session and delivers it to the window that has the project open.
 - [Troubleshooting](#troubleshooting)
 - [Building from source](#building-from-source)
 - [Contributing](#contributing)
+- [Support the project](#support-the-project)
 - [License](#license)
 
 ## Features
@@ -208,6 +209,11 @@ Dumpie is a young project, and I am always happy to make it better. Ideas, bug r
   easiest to review; for bigger ones, start with an issue so we can agree on the approach.
 - **Built something on top of Dumpie?** Forks are welcome too. Keep the license notice, and feel free to share what
   you made.
+
+## Support the project
+
+Dumpie is free and will stay free. If it saves you time, you can support its development with a donation on
+[Boosty](https://boosty.to/sadonsergey/donate). A star on GitHub helps too: it makes the project easier to find.
 
 ## License
 

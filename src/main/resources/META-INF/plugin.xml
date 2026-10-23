@@ -43,7 +43,8 @@
             <li>Light and dark themes and fonts follow the IDE.</li>
         </ul>
 
-        <p>Dumpie listens on <code>127.0.0.1</code> only, so nothing leaves your machine. Free and open source (MIT).</p>
+        <p>Dumpie listens on <code>127.0.0.1</code> only, so nothing leaves your machine. Free and open source (MIT).
+        If Dumpie saves you time, you can <a href="https://boosty.to/sadonsergey/donate">support it on Boosty</a>.</p>
 
         <p><small>Dumpie is an independent project, not affiliated with or endorsed by Spatie.
         Ray and spatie/ray are products of Spatie.</small></p>

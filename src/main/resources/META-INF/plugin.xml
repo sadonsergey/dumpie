@@ -1,0 +1,66 @@
+<idea-plugin>
+    <id>dev.sadonsergey.dumpie</id>
+    <name>Dumpie</name>
+    <vendor>Sergey Sadon</vendor>
+    <description><![CDATA[
+        <p>PHP debug output right inside the IDE. <code>dump()</code>, <code>dd()</code>, log records, SQL queries,
+        exceptions and <code>ray()</code> calls appear in a tool window next to your code, with a link to the line
+        that produced them.</p>
+
+        <h3>What it catches</h3>
+        <ul>
+            <li><b>dump() and dd()</b> from any project with <code>symfony/var-dumper</code> (Laravel, Symfony, …):
+                add <code>VAR_DUMPER_FORMAT=server</code> to <code>.env</code>, or press <i>Add to .env</i> in the settings.</li>
+            <li><b>Log files</b>: new records from <code>storage/logs</code> or <code>var/log</code>, colored by level,
+                with the stack trace.</li>
+            <li><b>spatie/ray and spatie/laravel-ray</b> work without any changes: tables, queries, events, jobs, mails,
+                models, exceptions, measurements, <code>pause()</code>, colors, labels and screens.</li>
+        </ul>
+
+        <h3>Built for reading</h3>
+        <ul>
+            <li>Interactive dumps colored with your editor scheme; light and dark themes follow the IDE.</li>
+            <li>Exceptions with the code around the failing line and folded vendor frames.</li>
+            <li>Filter by color, search, pause the feed, collapse entries.</li>
+            <li>Copy any entry as a Markdown code block that keeps highlighting in chats and issues.</li>
+            <li>One session per project, a switcher between projects and an <i>All projects</i> feed.</li>
+            <li>Several IDEs at once: with PhpStorm and WebStorm open together, output reaches the IDE that has the
+                project open.</li>
+            <li>When a project cannot send anything yet, the empty tool window shows what is missing, with an
+                <i>Add to .env</i> button.</li>
+            <li>Docker and Sail paths are matched to project files automatically.</li>
+        </ul>
+
+        <p>The project is inspected on first open: Dumpie reads <code>composer.lock</code>, <code>.env</code> and the log
+        directories and enables what fits. Everything is adjustable in <i>Settings | Tools | Dumpie</i>.
+        Dumpie listens on 127.0.0.1 only; nothing leaves your machine.</p>
+
+        <p><small>Dumpie is an independent project, not affiliated with or endorsed by Spatie.
+        Ray and spatie/ray are products of Spatie.</small></p>
+    ]]></description>
+
+    <change-notes><![CDATA[
+        <p><b>0.1.0</b></p>
+        <ul>
+            <li>First release: dump()/dd() via VarDumper server mode, log file following, spatie/ray compatibility.</li>
+            <li>Per-project sessions with an All projects feed, color filters, search, pause, copy as Markdown.</li>
+            <li>Settings page with project auto-detection and setup hints in the empty tool window.</li>
+            <li>Output is routed between several IDEs running Dumpie at the same time.</li>
+        </ul>
+    ]]></change-notes>
+
+    <depends>com.intellij.modules.platform</depends>
+    <!-- JCEF is a separate plugin since 2025.3.1; on older builds it is part of the platform and this is skipped -->
+    <depends optional="true" config-file="dumpie-jcef.xml">com.intellij.modules.jcef</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <toolWindow id="Dumpie" anchor="right" icon="/icons/dumpieToolWindow.svg"
+                    factoryClass="dev.sadonsergey.dumpie.ui.DumpieToolWindowFactory"/>
+        <postStartupActivity implementation="dev.sadonsergey.dumpie.DumpieStartupActivity"/>
+        <notificationGroup id="Dumpie" displayType="BALLOON"/>
+        <!-- New UI tool window icons (icons/expui) for the classic ones -->
+        <iconMapper mappingFile="DumpieIconMappings.json"/>
+        <projectConfigurable parentId="tools" id="dev.sadonsergey.dumpie.settings" displayName="Dumpie"
+                             instance="dev.sadonsergey.dumpie.settings.DumpieConfigurable"/>
+    </extensions>
+</idea-plugin>

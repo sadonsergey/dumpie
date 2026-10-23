@@ -1,0 +1,74 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build plugin
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Build
+        run: ./gradlew buildPlugin verifyPluginStructure
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dumpie-plugin
+          path: build/distributions/*.zip
+
+  verify:
+    name: Verify ${{ matrix.ide }}
+    needs: build
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      # Every job fetches the verifier from Maven Central; too many at once get HTTP 429
+      max-parallel: 4
+      # One IDE per job: every IDE is a large download and they do not fit on one runner together
+      matrix:
+        ide:
+          - PhpStorm:2024.3
+          - PhpStorm:2025.1
+          - PhpStorm:2025.2
+          - PhpStorm:2025.3
+          - PhpStorm:2026.1
+          - PhpStorm:2026.2
+          - WebStorm:2024.3
+          - WebStorm:2025.1
+          - WebStorm:2025.2
+          - WebStorm:2025.3
+          - WebStorm:2026.1
+          - WebStorm:2026.2
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Run Plugin Verifier
+        run: ./gradlew verifyPlugin -PverifyIdes=${{ matrix.ide }}
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: verifier-report-${{ strategy.job-index }}
+          path: build/reports/pluginVerifier

@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="utf-8">
+    <style>/*CSS*/</style>
+</head>
+<body>
+<div id="top" class="top pinned">
+<header class="toolbar">
+    <button id="pause" class="icon" type="button" title="Pause feed">
+        <svg class="i-pause" viewBox="0 0 16 16"><rect x="3.5" y="2.5" width="3" height="11" rx="1"/><rect x="9.5" y="2.5" width="3" height="11" rx="1"/></svg>
+        <svg class="i-play" viewBox="0 0 16 16"><path d="M4.5 2.9v10.2a.7.7 0 0 0 1.1.6l8-5.1a.7.7 0 0 0 0-1.2l-8-5.1a.7.7 0 0 0-1.1.6z"/></svg>
+    </button>
+    <button id="search" class="icon" type="button" title="Search">
+        <svg viewBox="0 0 16 16"><path d="M7 2a5 5 0 0 1 3.97 8.04l2.75 2.75-1.06 1.06-2.75-2.75A5 5 0 1 1 7 2zm0 1.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7z"/></svg>
+    </button>
+    <button id="new-screen" class="icon" type="button" title="New screen">
+        <svg viewBox="0 0 16 16"><path d="M3 2.5h10A1.5 1.5 0 0 1 14.5 4v8a1.5 1.5 0 0 1-1.5 1.5H3A1.5 1.5 0 0 1 1.5 12V4A1.5 1.5 0 0 1 3 2.5zm0 1.5v8h10V4H3zm4.25 1.5h1.5v1.75h1.75v1.5H8.75v1.75h-1.5V8.75H5.5v-1.5h1.75V5.5z"/></svg>
+    </button>
+    <button id="clear" class="icon" type="button" title="Clear all">
+        <svg viewBox="0 0 16 16"><path d="M12.9 1.6l1.1 1.1-4.3 4.3.9.9c.6.6.6 1.5 0 2.1L7.3 13.3 2.7 8.7 6 5.4c.6-.6 1.5-.6 2.1 0l.9.9 3.9-4.7zM2 9.4l4.6 4.6-.6.6c-.4.4-1 .4-1.4 0L1.4 11.4c-.4-.4-.4-1 0-1.4l.6-.6z"/></svg>
+    </button>
+    <input id="filter" type="search" placeholder="Search…" autocomplete="off" hidden>
+    <span class="spacer"></span>
+    <span id="count" class="muted count"></span>
+    <div id="colors" class="colors">
+        <button class="dot color-green" data-color="green" title="Green"></button>
+        <button class="dot color-orange" data-color="orange" title="Orange"></button>
+        <button class="dot color-red" data-color="red" title="Red"></button>
+        <button class="dot color-purple" data-color="purple" title="Purple"></button>
+        <button class="dot color-blue" data-color="blue" title="Blue"></button>
+        <button class="dot color-gray" data-color="gray" title="Gray"></button>
+    </div>
+</header>
+<nav id="session-bar" class="session-bar" hidden></nav>
+<div id="paused-bar" class="paused-bar" hidden>
+    <span>Feed paused · <b id="pending">0</b> new</span>
+    <button id="resume" type="button">Resume</button>
+</div>
+<nav id="screen-bar" class="screen-bar" hidden></nav>
+</div>
+<main id="feed">
+    <div id="empty" class="empty">
+        <div class="empty-title">Nothing caught yet</div>
+        <div id="guide-lead" class="empty-lead muted">Debug output will appear here.</div>
+        <div id="guide" class="guide"></div>
+        <div id="guide-links" class="guide-links" hidden>
+            <a data-action="settings">Settings</a>
+            <a href="https://github.com/sadonsergey/dumpie#quick-start">Documentation</a>
+            <a data-action="refresh">Refresh</a>
+        </div>
+    </div>
+</main>
+<script>/*JS*/</script>
+</body>
+</html>

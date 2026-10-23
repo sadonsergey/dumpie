@@ -1,0 +1,9 @@
+{
+  "icons": {
+    "expui": {
+      "toolwindow": {
+        "dumpie.svg": "icons/dumpieToolWindow.svg"
+      }
+    }
+  }
+}

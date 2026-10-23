@@ -3,9 +3,11 @@ package dev.sadonsergey.dumpie.ui
 import com.google.gson.JsonArray
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
+import com.google.gson.JsonPrimitive
 import com.intellij.ide.BrowserUtil
 import com.intellij.ide.ui.LafManagerListener
 import com.intellij.openapi.ide.CopyPasteManager
+import com.intellij.openapi.keymap.KeymapUtil
 import com.intellij.openapi.options.ShowSettingsUtil
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
@@ -13,6 +15,7 @@ import com.intellij.openapi.components.service
 import com.intellij.openapi.editor.DefaultLanguageHighlighterColors
 import com.intellij.openapi.editor.colors.EditorColorsListener
 import com.intellij.openapi.editor.colors.EditorColorsManager
+import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.ProjectManager
 import com.intellij.openapi.project.ProjectManagerListener
@@ -20,6 +23,7 @@ import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.vfs.VirtualFileManager
 import com.intellij.openapi.vfs.newvfs.BulkFileListener
 import com.intellij.openapi.vfs.newvfs.events.VFileEvent
+import com.intellij.testFramework.LightVirtualFile
 import com.intellij.ui.JBColor
 import com.intellij.ui.jcef.JBCefBrowser
 import com.intellij.ui.jcef.JBCefBrowserBase
@@ -39,6 +43,10 @@ import org.cef.handler.CefLoadHandlerAdapter
 import java.awt.Color
 import java.awt.datatransfer.StringSelection
 import com.intellij.util.concurrency.AppExecutorUtil
+import com.intellij.util.text.DateFormatUtil
+import java.time.LocalDate
+import java.time.ZoneId
+import java.util.Locale
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentLinkedQueue
@@ -70,6 +78,12 @@ class DumpiePanel(private val project: Project, parent: Disposable) {
     private val unread = ConcurrentHashMap<Project, Int>()
     private val sessionsPushPending = AtomicBoolean(false)
 
+    // Entry to scroll to once the page has loaded: a gutter icon clicked before the tool window was opened
+    @Volatile
+    private var loaded = false
+    @Volatile
+    private var pendingReveal: String? = null
+
     val component: JComponent get() = browser.component
 
     init {
@@ -93,6 +107,11 @@ class DumpiePanel(private val project: Project, parent: Disposable) {
                 applyTheme()
                 applyOptions()
                 show(viewed)
+                loaded = true
+                pendingReveal?.let {
+                    pendingReveal = null
+                    reveal(it)
+                }
             }
         }, browser.cefBrowser)
 
@@ -126,7 +145,9 @@ class DumpiePanel(private val project: Project, parent: Disposable) {
         val scheme = EditorColorsManager.getInstance().globalScheme
         val uiFont = UIUtil.getLabelFont()
         val vars = JsonObject().apply {
-            addProperty("--bg", css(JBUI.CurrentTheme.ToolWindow.background()))
+            // Light themes may use the editor background (white) instead of the gray tool window one
+            val editorBackground = JBColor.isBright() && DumpieSettings.get().whiteBackgroundInLightThemes
+            addProperty("--bg", css(if (editorBackground) scheme.defaultBackground else JBUI.CurrentTheme.ToolWindow.background()))
             addProperty("--fg", css(UIUtil.getLabelForeground()))
             addProperty("--muted", css(UIUtil.getContextHelpForeground()))
             addProperty("--border", css(JBColor.border()))
@@ -143,7 +164,17 @@ class DumpiePanel(private val project: Project, parent: Disposable) {
     }
 
     private fun applyOptions() {
-        execute("window.dumpie && window.dumpie.options({pinBars: ${DumpieSettings.get().pinBars}});")
+        // Entry times follow the IDE's time format (system format or Settings | System Settings | Date Formats)
+        val onePm = LocalDate.now().atTime(13, 5).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+        val hour12 = !DateFormatUtil.formatTimeWithSeconds(onePm).contains("13")
+        val locale = Locale.getDefault().toLanguageTag()
+        val settings = DumpieSettings.get()
+        val shortcuts = JsonObject().apply {
+            SHORTCUT_ACTIONS.forEach { (name, id) -> addProperty(name, KeymapUtil.getFirstKeyboardShortcutText(id)) }
+        }
+        execute("window.dumpie && window.dumpie.options({pinBars: ${settings.pinBars}, locale: '$locale', hour12: $hour12, " +
+            "queryStats: ${settings.showQueryStats}, repeatedQueries: ${settings.markRepeatedQueries}, " +
+            "slowQueryMs: ${if (settings.markSlowQueries) settings.slowQueryMs else 0}, shortcuts: $shortcuts});")
     }
 
     private fun css(color: Color) = "rgb(${color.red}, ${color.green}, ${color.blue})"
@@ -178,6 +209,18 @@ class DumpiePanel(private val project: Project, parent: Disposable) {
             attached[p] = { json -> enqueue("{\"r\":$json,\"s\":$source}") }
         }
         DumpieProjectService.attachAll(attached.mapKeys { (p, _) -> p.service<DumpieProjectService>() })
+    }
+
+    /** Scrolls to an entry of this panel's project (gutter icon click), switching back to that session if needed. */
+    @Synchronized
+    private fun reveal(uuid: String) {
+        if (!loaded) {
+            pendingReveal = uuid
+            return
+        }
+        if (viewed != null && viewed != project) show(project)
+        flush()
+        execute("window.dumpie.reveal(${JsonPrimitive(uuid)});")
     }
 
     private fun enqueue(item: String) {
@@ -246,7 +289,7 @@ class DumpiePanel(private val project: Project, parent: Disposable) {
         val sessions = JsonArray()
         sessions.add(JsonObject().apply {
             addProperty("id", ALL)
-            addProperty("name", "All projects")
+            addProperty("name", "All")
             addProperty("viewed", viewed == null)
         })
         openProjects(closing).forEach { p ->
@@ -269,9 +312,25 @@ class DumpiePanel(private val project: Project, parent: Disposable) {
         private const val FLUSH_BATCH = 300
 
         private val SETUP_FILES = setOf(".env", "composer.lock")
+        private val EXTENSION = Regex("\\w{1,10}")
+        private val UNSAFE_NAME = Regex("[^\\w.:#\\- ]+")
 
         /** Called when a project opens: switchers list it, and panels showing all projects start receiving from it. */
         fun projectsChanged() = panels.forEach { if (it.viewed == null) it.show(null) else it.pushSessions() }
+
+        fun reveal(project: Project, uuid: String) = panels.firstOrNull { it.project == project }?.reveal(uuid)
+
+        fun exists(project: Project) = panels.any { it.project == project }
+
+        /** A keyboard action (see DumpieActions): clearAll, clearScreen, newScreen, pause, search, nextScreen, previousScreen. */
+        fun command(project: Project, name: String) =
+            panels.firstOrNull { it.project == project }?.execute("window.dumpie && window.dumpie.command(${JsonPrimitive(name)});")
+
+        // Toolbar tooltips show the current shortcuts, remapped ones included
+        private val SHORTCUT_ACTIONS = mapOf(
+            "clearAll" to "Dumpie.ClearAll", "clearScreen" to "Dumpie.ClearScreen", "newScreen" to "Dumpie.NewScreen",
+            "pause" to "Dumpie.Pause", "search" to "Dumpie.Search",
+        )
 
         /** The page with app.css and app.js inlined. */
         internal fun page(): String {
@@ -284,11 +343,12 @@ class DumpiePanel(private val project: Project, parent: Disposable) {
 
         /** Called after the settings page is applied. */
         fun settingsChanged() = panels.forEach {
+            it.applyTheme()
             it.applyOptions()
             it.pushStatus()
         }
 
-        // Editor highlighting used to color VarDumper output (see --syn-* in app.css)
+        // Editor highlighting used to color VarDumper output and exception snippets (see --syn-* in app.css)
         private val SYNTAX_KEYS = mapOf(
             "--syn-string" to DefaultLanguageHighlighterColors.STRING,
             "--syn-number" to DefaultLanguageHighlighterColors.NUMBER,
@@ -296,11 +356,22 @@ class DumpiePanel(private val project: Project, parent: Disposable) {
             "--syn-field" to DefaultLanguageHighlighterColors.INSTANCE_FIELD,
             "--syn-class" to DefaultLanguageHighlighterColors.CLASS_NAME,
             "--syn-meta" to DefaultLanguageHighlighterColors.METADATA,
+            "--syn-function" to DefaultLanguageHighlighterColors.FUNCTION_CALL,
+            "--syn-comment" to DefaultLanguageHighlighterColors.LINE_COMMENT,
         )
     }
 
     private fun execute(js: String) {
         browser.cefBrowser.executeJavaScript(js, browser.cefBrowser.url, 0)
+    }
+
+    /** An entry in an editor tab of this window; the extension picks the highlighting. */
+    private fun openInEditor(text: String, lang: String, title: String) {
+        // Dumps are VarDumper text, not PHP code: as .php they would get no highlighting at all
+        val extension = lang.takeIf { it.matches(EXTENSION) && it != "php" } ?: "txt"
+        val name = title.replace(UNSAFE_NAME, " ").trim().take(60).ifEmpty { "entry" }
+        val file = LightVirtualFile("Dumpie $name.$extension", text)
+        ApplicationManager.getApplication().invokeLater({ FileEditorManager.getInstance(project).openFile(file, true) }, project.disposed)
     }
 
     private fun onMessage(message: String) {
@@ -326,12 +397,45 @@ class DumpiePanel(private val project: Project, parent: Disposable) {
                 else -> findProject(id)?.let { show(it) }
             }
             "copy" -> msg.str("text")?.let { CopyPasteManager.getInstance().setContents(StringSelection(it)) }
+            "openText" -> msg.str("text")?.let { text -> openInEditor(text, msg.str("lang").orEmpty(), msg.str("title").orEmpty()) }
             "addEnv" -> ApplicationManager.getApplication().invokeLater({ SetupGuide.addToEnv(viewed ?: project); pushStatus() }, project.disposed)
             "settings" -> ApplicationManager.getApplication().invokeLater({
                 ShowSettingsUtil.getInstance().showSettingsDialog(viewed ?: project, DumpieConfigurable::class.java)
             }, project.disposed)
             "refresh" -> pushStatus()
             "newScreen" -> (viewed ?: project).service<DumpieProjectService>().receive(newScreenRequest())
+            "removeRequests" -> {
+                val uuids = (msg.get("uuids") as? JsonArray)?.mapNotNull { it.takeIf { e -> e.isJsonPrimitive }?.asString }?.toSet() ?: return
+                val sessions = viewed?.let { listOf(it) } ?: openProjects()
+                val title = msg.str("title") ?: "Removed"
+                sessions.forEach { it.service<DumpieProjectService>().removeRequests(uuids, title) }
+                // Other windows showing these sessions replay them without the closed screen
+                panels.filter { it !== this && (it.viewed == null || it.viewed in sessions) }.forEach { it.show(it.viewed) }
+            }
+            "archive" -> {
+                val list = JsonArray()
+                (viewed?.let { listOf(it) } ?: openProjects())
+                    .flatMap { p -> p.service<DumpieProjectService>().archived().map { p to it } }
+                    .sortedByDescending { (_, item) -> item.time }
+                    .forEach { (p, item) ->
+                        list.add(JsonObject().apply {
+                            addProperty("id", item.id)
+                            addProperty("session", p.locationHash)
+                            addProperty("project", p.name)
+                            addProperty("time", item.time)
+                            addProperty("title", item.title)
+                            addProperty("count", item.count)
+                        })
+                    }
+                execute("window.dumpie.archive($list);")
+            }
+            "restore" -> {
+                val session = msg.str("session")?.let(::findProject) ?: return
+                val id = msg.get("id")?.takeIf { it.isJsonPrimitive }?.asLong ?: return
+                if (!session.service<DumpieProjectService>().restore(id)) return
+                // Every window showing this session replays it with the restored output
+                panels.filter { it.viewed == null || it.viewed == session }.forEach { it.show(it.viewed) }
+            }
             "browse" -> msg.str("url")
                 ?.takeIf { it.startsWith("http://") || it.startsWith("https://") || it.startsWith("mailto:") }
                 ?.let { BrowserUtil.browse(it) }

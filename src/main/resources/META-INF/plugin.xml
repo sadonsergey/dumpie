@@ -26,7 +26,9 @@
             <li><b>ray()</b>: tables, queries, events, jobs, mails, models, exceptions, <code>measure()</code>,
                 <code>pause()</code>, colors and screens.</li>
             <li><b>Exceptions</b> with the code around the failing line; vendor frames are folded.</li>
-            <li><b>Jump to code</b>: click <code>File.php:42</code>. Docker and Sail paths are mapped to your project.</li>
+            <li><b>Jump to code</b>: click <code>File.php:42</code>. Docker and Sail paths are mapped to your project.
+                And back: an icon in the editor gutter marks the lines that sent output.</li>
+            <li><b>SQL insights</b>: repeated queries (possible N+1) and slow ones are marked, with totals per screen.</li>
         </ul>
 
         <h3>Many projects, many IDEs</h3>
@@ -38,8 +40,9 @@
 
         <h3>Made for reading</h3>
         <ul>
-            <li>Filter by color or text, pause the feed, collapse entries.</li>
-            <li>Copy any entry as a Markdown code block for chats and issues.</li>
+            <li>Filter by color or text, pause the feed, collapse entries, keyboard shortcuts in the tool window.</li>
+            <li>Copy any entry as a Markdown code block, or open it in an editor tab.</li>
+            <li>Cleared by mistake? Restore it from the archive of cleared output.</li>
             <li>Light and dark themes and fonts follow the IDE.</li>
         </ul>
 
@@ -51,6 +54,20 @@
     ]]></description>
 
     <change-notes><![CDATA[
+        <p><b>0.2.0</b></p>
+        <ul>
+            <li>Gutter icons on the lines that produced output: hover shows what they sent, a click reveals the entry.</li>
+            <li>SQL insights: repeated queries (possible N+1), slow queries and per-screen totals.</li>
+            <li>Archive of cleared output: anything removed by Clear can be restored to its project.</li>
+            <li>Keyboard actions in the tool window (clear, clear screen, new screen, pause, search, switch screens),
+                remappable in the keymap.</li>
+            <li>Open any entry in an editor tab; close single screens.</li>
+            <li>Syntax highlighting for exception code, SQL and JSON; long stack traces are folded.</li>
+            <li>Entries are cards, lighter backgrounds, a white background in light themes (optional),
+                compact bars, time in the IDE's format, a clear state for filters that match nothing.</li>
+            <li>Every new option can be turned off in Settings | Tools | Dumpie.</li>
+        </ul>
+
         <p><b>0.1.0</b></p>
         <ul>
             <li>First release: dump()/dd() via VarDumper server mode, log file following, spatie/ray compatibility.</li>
@@ -73,5 +90,48 @@
         <iconMapper mappingFile="DumpieIconMappings.json"/>
         <projectConfigurable parentId="tools" id="dev.sadonsergey.dumpie.settings" displayName="Dumpie"
                              instance="dev.sadonsergey.dumpie.settings.DumpieConfigurable"/>
+        <actionPromoter implementation="dev.sadonsergey.dumpie.ui.DumpieActionPromoter"/>
     </extensions>
+
+    <!-- Default shortcuts work inside the Dumpie tool window (see DumpieCommandAction) -->
+    <actions>
+        <group id="Dumpie.Actions" text="Dumpie" popup="true">
+            <add-to-group group-id="ToolsMenu" anchor="last"/>
+            <action id="Dumpie.ClearAll" class="dev.sadonsergey.dumpie.ui.ClearAllAction" text="Clear All"
+                    description="Clear the Dumpie session">
+                <keyboard-shortcut keymap="$default" first-keystroke="control K"/>
+                <keyboard-shortcut keymap="Mac OS X 10.5+" first-keystroke="meta K" replace-all="true"/>
+            </action>
+            <action id="Dumpie.ClearScreen" class="dev.sadonsergey.dumpie.ui.ClearScreenAction" text="Clear Screen"
+                    description="Clear the current Dumpie screen">
+                <keyboard-shortcut keymap="$default" first-keystroke="control L"/>
+                <keyboard-shortcut keymap="Mac OS X 10.5+" first-keystroke="meta L" replace-all="true"/>
+            </action>
+            <action id="Dumpie.NewScreen" class="dev.sadonsergey.dumpie.ui.NewScreenAction" text="New Screen"
+                    description="Start a new Dumpie screen">
+                <keyboard-shortcut keymap="$default" first-keystroke="control N"/>
+                <keyboard-shortcut keymap="Mac OS X 10.5+" first-keystroke="meta N" replace-all="true"/>
+            </action>
+            <action id="Dumpie.Pause" class="dev.sadonsergey.dumpie.ui.PauseAction" text="Pause / Resume Feed"
+                    description="Pause or resume the Dumpie feed">
+                <keyboard-shortcut keymap="$default" first-keystroke="control P"/>
+                <keyboard-shortcut keymap="Mac OS X 10.5+" first-keystroke="meta P" replace-all="true"/>
+            </action>
+            <action id="Dumpie.Search" class="dev.sadonsergey.dumpie.ui.SearchAction" text="Search"
+                    description="Search the Dumpie feed">
+                <keyboard-shortcut keymap="$default" first-keystroke="control F"/>
+                <keyboard-shortcut keymap="Mac OS X 10.5+" first-keystroke="meta F" replace-all="true"/>
+            </action>
+            <action id="Dumpie.NextScreen" class="dev.sadonsergey.dumpie.ui.NextScreenAction" text="Next Screen"
+                    description="Show the next Dumpie screen">
+                <keyboard-shortcut keymap="$default" first-keystroke="control CLOSE_BRACKET"/>
+                <keyboard-shortcut keymap="Mac OS X 10.5+" first-keystroke="meta CLOSE_BRACKET" replace-all="true"/>
+            </action>
+            <action id="Dumpie.PreviousScreen" class="dev.sadonsergey.dumpie.ui.PreviousScreenAction" text="Previous Screen"
+                    description="Show the previous Dumpie screen">
+                <keyboard-shortcut keymap="$default" first-keystroke="control OPEN_BRACKET"/>
+                <keyboard-shortcut keymap="Mac OS X 10.5+" first-keystroke="meta OPEN_BRACKET" replace-all="true"/>
+            </action>
+        </group>
+    </actions>
 </idea-plugin>

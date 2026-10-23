@@ -7,6 +7,7 @@ import com.intellij.notification.NotificationType
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.Service
+import com.intellij.openapi.components.service
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.wm.ToolWindowManager
@@ -20,6 +21,9 @@ import java.util.concurrent.CopyOnWriteArrayList
 @Service(Service.Level.PROJECT)
 class DumpieProjectService(private val project: Project) {
     private val history = ArrayDeque<Entry>()
+
+    // What clears removed, newest first, so it can be restored
+    private val archive = ArrayDeque<Archived>()
     private val listeners = mutableListOf<(String) -> Unit>()
 
     fun receive(request: JsonObject) {
@@ -32,11 +36,18 @@ class DumpieProjectService(private val project: Project) {
         val json = request.toString()
 
         synchronized(LOCK) {
-            if ("clear_all" in types) history.clear()
-            history.addLast(Entry(sequence++, json))
+            if ("clear_all" in types) {
+                archive("Cleared from PHP", history.toList())
+                history.clear()
+            }
+            history.addLast(Entry(sequence++, json, request.str("uuid"), types))
             if (history.size > MAX_HISTORY) history.removeFirst()
             listeners.forEach { it(json) }
         }
+
+        val markers = project.service<OutputMarkers>()
+        if ("clear_all" in types) markers.clear()
+        markers.record(request)
 
         // Unread counters of the session bars: only output that adds an entry counts
         when {
@@ -52,9 +63,39 @@ class DumpieProjectService(private val project: Project) {
 
     fun detach(listener: (String) -> Unit) = synchronized(LOCK) { listeners -= listener }
 
+    /** Drops the requests of a closed or cleared screen (follow-up requests included); they go to the archive. */
+    fun removeRequests(uuids: Set<String>, title: String) = synchronized(LOCK) {
+        archive(title, history.filter { it.uuid in uuids })
+        history.removeAll { it.uuid in uuids }
+    }
+
     fun clear() {
-        synchronized(LOCK) { history.clear() }
+        synchronized(LOCK) {
+            archive("Clear all", history.toList())
+            history.clear()
+        }
+        project.service<OutputMarkers>().clear()
         activityListeners.forEach { it(project, true) }
+    }
+
+    fun archived(): List<Archived> = synchronized(LOCK) { archive.toList() }
+
+    /** Puts archived output back where it was; an earlier clear_all would hide it again, so those go. */
+    fun restore(id: Long): Boolean = synchronized(LOCK) {
+        val item = archive.firstOrNull { it.id == id } ?: return false
+        archive.remove(item)
+        val merged = (history.filter { "clear_all" !in it.types } + item.entries).sortedBy { it.seq }.takeLast(MAX_HISTORY)
+        history.clear()
+        history.addAll(merged)
+        true
+    }
+
+    // Under LOCK
+    private fun archive(title: String, removed: List<Entry>) {
+        val item = Archived(sequence, System.currentTimeMillis(), title, removed)
+        if (item.count == 0) return
+        archive.addFirst(item)
+        if (archive.size > MAX_ARCHIVE) archive.removeLast()
     }
 
     private fun applySideEffects(types: Set<String>, payloads: List<JsonObject>) {
@@ -73,12 +114,19 @@ class DumpieProjectService(private val project: Project) {
         }
     }
 
-    private class Entry(val seq: Long, val json: String)
+    class Entry internal constructor(internal val seq: Long, internal val json: String, internal val uuid: String?, internal val types: Set<String>)
+
+    /** One clear: its title for the archive list and the requests it removed. */
+    class Archived internal constructor(val id: Long, val time: Long, val title: String, internal val entries: List<Entry>) {
+        /** Entries the page showed (follow-up requests and screen markers do not count). */
+        val count: Int = entries.filter { e -> e.types.any { it !in SILENT_TYPES && it != "clear_all" } }.mapNotNull { it.uuid }.toSet().size
+    }
 
     companion object {
         const val TOOL_WINDOW_ID = "Dumpie"
         private const val MAX_HISTORY = 1000
-        private const val RECEIVED_AT = "dumpie_received_at"
+        private const val MAX_ARCHIVE = 10
+        internal const val RECEIVED_AT = "dumpie_received_at"
 
         // Payload types that only modify or control an entry, so they do not count as new output
         private val SILENT_TYPES = setOf(

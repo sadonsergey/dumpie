@@ -6,6 +6,8 @@
     const screenBar = document.getElementById('screen-bar');
     const filter = document.getElementById('filter');
     const count = document.getElementById('count');
+    const queryStats = document.getElementById('query-stats');
+    const noMatch = document.getElementById('no-match');
     const pauseButton = document.getElementById('pause');
     const searchButton = document.getElementById('search');
     const pausedBar = document.getElementById('paused-bar');
@@ -19,8 +21,13 @@
     const MAX_ENTRIES = 1500;
     let allProjects = false;
     let pending = [];
+    // Set by the IDE (options()); until then the browser defaults apply
+    let timeFormat = { locale: undefined, hour12: undefined };
 
     const COPY_ICON = '<svg viewBox="0 0 16 16"><path d="M5 1.5h7.5A1.5 1.5 0 0 1 14 3v8.5a1.5 1.5 0 0 1-1.5 1.5H11v-1.5h1.5V3H5v1.5H3.5V3A1.5 1.5 0 0 1 5 1.5zM2 6.5A1.5 1.5 0 0 1 3.5 5h6A1.5 1.5 0 0 1 11 6.5v6A1.5 1.5 0 0 1 9.5 14h-6A1.5 1.5 0 0 1 2 12.5v-6zm1.5 0v6h6v-6h-6z"/></svg>';
+    const OPEN_ICON = '<svg viewBox="0 0 16 16"><path d="M3.5 2h4v1.5h-4v9h9v-4H14v4a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 2 12.5v-9A1.5 1.5 0 0 1 3.5 2zm6-.5H14.5V6.5H13V4.06L7.53 9.53 6.47 8.47 11.94 3H9.5V1.5z"/></svg>';
+    const PROJECTS_ICON = '<svg viewBox="0 0 16 16"><path d="M2.5 2.5h4l1.5 1.5h5.5A1.5 1.5 0 0 1 15 5.5v7a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 1 12.5v-8.5A1.5 1.5 0 0 1 2.5 2.5zm0 1.5v8.5h11v-7H7.38L5.88 4H2.5z"/></svg>';
+    const SCREENS_ICON = '<svg viewBox="0 0 16 16"><path d="M5 1.5h8A1.5 1.5 0 0 1 14.5 3v7a1.5 1.5 0 0 1-1.5 1.5h-1.5V10H13V3H5v1.5H3.5V3A1.5 1.5 0 0 1 5 1.5zM3 5.5h8A1.5 1.5 0 0 1 12.5 7v6A1.5 1.5 0 0 1 11 14.5H3A1.5 1.5 0 0 1 1.5 13V7A1.5 1.5 0 0 1 3 5.5zM3 7v6h8V7H3z"/></svg>';
     const CHECK_ICON = '<svg viewBox="0 0 16 16"><path d="M13.3 3.8l1.1 1.1-7.6 7.6-4.2-4.2 1.1-1.1 3.1 3.1z"/></svg>';
 
     // JCEF renders off-screen and may leave stale pixels where content shrank (e.g. the setup guide going from
@@ -68,7 +75,7 @@
         if (value === null || value === undefined) return '<pre class="box">null</pre>';
         if (typeof value === 'boolean' || typeof value === 'number') return '<pre class="box">' + value + '</pre>';
         if (isDump(value)) return value;
-        if (typeof value === 'object') return '<pre class="box">' + esc(JSON.stringify(value, null, 2)) + '</pre>';
+        if (typeof value === 'object') return '<pre class="box">' + highlightJson(JSON.stringify(value, null, 2)) + '</pre>';
         return text(value);
     }
 
@@ -126,6 +133,117 @@
         return html + '</ul>';
     }
 
+    // Long stack traces: the first frames stay visible, the rest open with a button
+    const FRAMES_SHOWN = 3;
+    const LINES_SHOWN = 8;
+
+    function foldButton(count, what) {
+        const more = 'Show ' + count + ' more ' + what;
+        return '<button type="button" class="fold-toggle" data-more="' + more + '" data-less="Show less">' + more + '</button>';
+    }
+
+    function foldedFrames(list) {
+        list = list || [];
+        if (list.length <= FRAMES_SHOWN + 1) return frames(list);
+        return '<div class="foldable">' + frames(list.slice(0, FRAMES_SHOWN))
+            + '<div class="fold-rest">' + frames(list.slice(FRAMES_SHOWN)) + '</div>'
+            + foldButton(list.length - FRAMES_SHOWN, 'frames') + '</div>';
+    }
+
+    // Plain text such as a stack trace from a log file
+    function foldedText(value) {
+        const lines = String(value).split('\n');
+        if (lines.length <= LINES_SHOWN + 2) return '<pre class="box">' + esc(value) + '</pre>';
+        return '<div class="foldable"><pre class="box">' + esc(lines.slice(0, LINES_SHOWN).join('\n'))
+            + '<span class="fold-rest">\n' + esc(lines.slice(LINES_SHOWN).join('\n')) + '</span></pre>'
+            + foldButton(lines.length - LINES_SHOWN, 'lines') + '</div>';
+    }
+
+    // Snippets come as plain text; a light PHP highlighter colors them with the editor scheme (--syn-*)
+    const PHP_KEYWORDS = new Set(('abstract and array as break callable case catch class clone const continue declare default do '
+        + 'echo else elseif empty enum extends false final finally fn for foreach function global goto if implements include '
+        + 'include_once instanceof insteadof interface isset list match namespace new null or parent print private protected '
+        + 'public readonly require require_once return self static switch throw trait true try unset use var while xor yield '
+        + 'bool float int iterable mixed never object string void').split(' '));
+    const PHP_TOKEN = /(\/\/.*|#(?!\[).*|\/\*.*?(?:\*\/|$))|('(?:[^'\\]|\\.)*'?|"(?:[^"\\]|\\.)*"?)|(\$\w+)|\b(\d+(?:\.\d+)?)\b|([A-Za-z_]\w*)(?=\s*\()|([A-Za-z_]\w*)/g;
+
+    // state.comment carries an open /* ... */ over to the next line
+    function highlightPhp(line, state) {
+        let html = '';
+        let rest = line;
+        if (state.comment || /^\s*\*/.test(line)) {
+            const end = rest.indexOf('*/');
+            const cut = end === -1 ? rest.length : end + 2;
+            html += '<span class="syn-comment">' + esc(rest.slice(0, cut)) + '</span>';
+            state.comment = end === -1;
+            rest = rest.slice(cut);
+        }
+        let last = 0;
+        let m;
+        PHP_TOKEN.lastIndex = 0;
+        while ((m = PHP_TOKEN.exec(rest)) !== null) {
+            html += esc(rest.slice(last, m.index));
+            let cls = '';
+            if (m[1]) {
+                cls = 'syn-comment';
+                if (m[1].startsWith('/*') && !m[1].endsWith('*/')) state.comment = true;
+            } else if (m[2]) cls = 'syn-string';
+            else if (m[3]) cls = 'syn-var';
+            else if (m[4]) cls = 'syn-number';
+            else if (m[5]) cls = PHP_KEYWORDS.has(m[5].toLowerCase()) && !/(->|::)\s*$/.test(rest.slice(0, m.index)) ? 'syn-keyword' : 'syn-function';
+            else if (m[6] && PHP_KEYWORDS.has(m[6].toLowerCase())) cls = 'syn-keyword';
+            html += cls ? '<span class="' + cls + '">' + esc(m[0]) + '</span>' : esc(m[0]);
+            last = m.index + m[0].length;
+        }
+        return html + esc(rest.slice(last));
+    }
+
+    // Escapes text and wraps every match of a global regex in the span markup render() returns for it
+    function highlight(text, re, render) {
+        let html = '';
+        let last = 0;
+        let m;
+        text = String(text);
+        re.lastIndex = 0;
+        while ((m = re.exec(text)) !== null) {
+            if (!m[0]) { re.lastIndex++; continue; }
+            html += esc(text.slice(last, m.index)) + render(m);
+            last = m.index + m[0].length;
+        }
+        return html + esc(text.slice(last));
+    }
+
+    function syn(cls, text) {
+        return cls ? '<span class="' + cls + '">' + esc(text) + '</span>' : esc(text);
+    }
+
+    const SQL_KEYWORDS = new Set(('add all alter and as asc avg between by case cast count create cross default delete desc distinct '
+        + 'drop else end exists false from full group having if in index inner insert into is join key left like limit max min '
+        + 'not null offset on or order outer primary references returning right select set sum table then true truncate union '
+        + 'unique update using values when where with').split(' '));
+    const SQL_TOKEN = /(--.*|\/\*[\s\S]*?(?:\*\/|$))|('(?:[^']|'')*'?)|(`[^`]*`?|"[^"]*"?)|(\?|:[A-Za-z_]\w*)|\b(\d+(?:\.\d+)?)\b|([A-Za-z_]\w*)/g;
+
+    function highlightSql(text) {
+        return highlight(text, SQL_TOKEN, function (m) {
+            if (m[1]) return syn('syn-comment', m[0]);
+            if (m[2]) return syn('syn-string', m[0]);
+            if (m[3]) return syn('syn-field', m[0]);
+            if (m[4]) return syn('syn-var', m[0]);
+            if (m[5]) return syn('syn-number', m[0]);
+            return syn(SQL_KEYWORDS.has(m[6].toLowerCase()) ? 'syn-keyword' : '', m[0]);
+        });
+    }
+
+    const JSON_TOKEN = /("(?:[^"\\]|\\.)*")(\s*:)?|\b(true|false|null)\b|(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)/g;
+
+    function highlightJson(text) {
+        return highlight(text, JSON_TOKEN, function (m) {
+            if (m[1]) return m[2] ? syn('syn-field', m[1]) + esc(m[2]) : syn('syn-string', m[1]);
+            if (m[3]) return syn('syn-keyword', m[3]);
+            return syn('syn-number', m[4]);
+        });
+    }
+
     function framesText(list) {
         return (list || []).map(function (f, i) {
             return '#' + i + ' ' + frameWhere(f) + ' ' + f.file_name + ':' + f.line_number;
@@ -135,9 +253,12 @@
     function snippet(frame) {
         if (!frame || !Array.isArray(frame.snippet) || !frame.snippet.length) return '';
         let rows = '';
+        const php = /\.php$/i.test(frame.file_name || '');
+        const state = { comment: false };
         frame.snippet.forEach(function (row) {
             rows += '<div class="line' + (row.line_number === frame.line_number ? ' hl' : '') + '">'
-                + '<span class="ln">' + row.line_number + '</span><span class="code">' + esc(row.text) + '</span></div>';
+                + '<span class="ln">' + row.line_number + '</span><span class="code">'
+                + (php ? highlightPhp(String(row.text), state) : esc(row.text)) + '</span></div>';
         });
         return '<div class="snippet mono">'
             + '<div class="snippet-file">' + fileLink(frame.file_name, frame.line_number) + '</div>'
@@ -156,7 +277,7 @@
         return '<div class="exception-class mono">' + className(c.class) + '</div>'
             + '<div class="alert-message">' + esc(c.message) + '</div>'
             + snippet(appFrame)
-            + frames(c.frames);
+            + foldedFrames(c.frames);
     }
 
     function persons(list) {
@@ -180,9 +301,62 @@
     function renderQuery(c) {
         const meta = [c.connection_name, formatMs(c.time)].filter(Boolean).join(' · ');
         const bindings = Array.isArray(c.bindings) && c.bindings.length ? c.bindings : null;
-        return '<pre class="box">' + esc(c.sql) + '</pre>'
+        return '<pre class="box">' + highlightSql(c.sql) + '</pre>'
             + (bindings ? '<div class="muted mono query-meta">bindings: ' + esc(JSON.stringify(bindings)) + '</div>' : '')
             + (meta ? '<div class="muted mono query-meta">' + esc(meta) + '</div>' : '');
+    }
+
+    // SQL insights per screen: totals, repeated statements (possible N+1) and slow queries
+    const REPEAT_MIN = 3;
+    // Set by the IDE settings (options()); slowQueryMs 0 turns slow marks off
+    let slowQueryMs = 100;
+    let markRepeated = true;
+    let showQueryStats = true;
+
+    // The same statement with other values: string and number literals and IN lists become placeholders
+    function queryShape(sql) {
+        return String(sql).toLowerCase()
+            .replace(/'(?:[^']|'')*'/g, '?')
+            .replace(/\b\d+(?:\.\d+)?\b/g, '?')
+            .replace(/\(\s*\?(?:\s*,\s*\?)*\s*\)/g, '(?)')
+            .replace(/\s+/g, ' ')
+            .trim();
+    }
+
+    function trackQuery(entry, c) {
+        // A replaced entry (same uuid) is counted once
+        if (entry.dataset.query) return;
+        entry.dataset.query = '1';
+        const screen = screens.find(function (s) { return s.el.contains(entry); }) || screens[screens.length - 1];
+        const q = screen.queries || (screen.queries = { count: 0, time: 0, shapes: new Map() });
+        q.count++;
+        if (typeof c.time === 'number') q.time += c.time;
+
+        const shape = queryShape(c.sql);
+        const same = q.shapes.get(shape) || [];
+        same.push(entry);
+        q.shapes.set(shape, same);
+        if (markRepeated && same.length >= REPEAT_MIN) {
+            q.issues = true;
+            same.forEach(function (e) {
+                queryFlag(e, 'repeated', 'Repeated ×' + same.length, 'The same query ran ' + same.length + ' times on this screen: possible N+1');
+            });
+        }
+        if (slowQueryMs > 0 && typeof c.time === 'number' && c.time >= slowQueryMs) {
+            q.issues = true;
+            queryFlag(entry, 'slow', 'Slow', 'Took ' + formatMs(c.time) + ', the threshold is ' + slowQueryMs + ' ms');
+        }
+    }
+
+    function queryFlag(entry, kind, text, title) {
+        let flag = entry.querySelector('.query-flag.' + kind);
+        if (!flag) {
+            flag = document.createElement('span');
+            flag.className = 'query-flag ' + kind;
+            entry.querySelector('.entry-tags').appendChild(flag);
+        }
+        flag.textContent = text;
+        flag.title = title;
     }
 
     function formatMs(ms) {
@@ -233,7 +407,7 @@
             case 'table':
                 return { label: c.label || 'Table', html: kvTable(c.values), copy: null };
             case 'json_string':
-                return { label: 'JSON', html: '<pre class="box">' + esc(prettyJson(c.value)) + '</pre>', copy: { lang: 'json', text: prettyJson(c.value) } };
+                return { label: 'JSON', html: '<pre class="box">' + highlightJson(prettyJson(c.value)) + '</pre>', copy: { lang: 'json', text: prettyJson(c.value) } };
             case 'exception':
                 entry.classList.add('alert', 'color-red');
                 return {
@@ -242,7 +416,7 @@
                     copy: { lang: '', text: c.class + ': ' + c.message + '\n\n' + framesText(c.frames) }
                 };
             case 'trace':
-                return { label: 'Trace', html: frames(c.frames), copy: { lang: '', text: framesText(c.frames) } };
+                return { label: 'Trace', html: foldedFrames(c.frames), copy: { lang: '', text: framesText(c.frames) } };
             case 'caller':
                 return { label: 'Caller', html: frames([c.frame]), copy: { lang: '', text: framesText([c.frame]) } };
             case 'measure':
@@ -260,12 +434,14 @@
             case 'application_log':
                 // laravel-ray sends the level as a follow-up color request: red for errors, orange for warnings
                 entry.classList.add('alert');
+                // Log files deliver the context/stack trace as plain text; laravel-ray sends a dump
+                const plainContext = typeof c.context === 'string' && !isDump(c.context);
                 return {
                     label: c.level || 'Log',
-                    // Log files deliver the context/stack trace as plain text; laravel-ray sends a dump
                     html: '<div class="alert-message">' + esc(c.value) + '</div>'
-                        + (typeof c.context === 'string' && !isDump(c.context) ? '<pre class="box">' + esc(c.context) + '</pre>' : (c.context ? primitive(c.context) : '')),
-                    copy: null
+                        + (plainContext ? foldedText(c.context) : (c.context ? primitive(c.context) : '')),
+                    // The folded part is hidden, so the rendered text would miss it
+                    copy: plainContext ? { lang: '', text: c.value + '\n\n' + c.context } : null
                 };
             case 'executed_query':
                 return { label: 'Query', html: renderQuery(c), copy: { lang: 'sql', text: c.sql } };
@@ -304,7 +480,7 @@
                 entry.classList.add('collapsed');
                 return null;
             default:
-                return { label: type, html: '<pre class="box">' + esc(JSON.stringify(c, null, 2)) + '</pre>', copy: null };
+                return { label: type, html: '<pre class="box">' + highlightJson(JSON.stringify(c, null, 2)) + '</pre>', copy: null };
         }
     }
 
@@ -368,15 +544,17 @@
     // Time the IDE received the request (kept on replays after a session switch), or now
     function receivedTime(request) {
         const at = request && request.meta && request.meta.dumpie_received_at;
-        return (at ? new Date(at) : new Date()).toLocaleTimeString();
+        return (at ? new Date(at) : new Date()).toLocaleTimeString(timeFormat.locale, { hour12: timeFormat.hour12 });
     }
 
     // time: when the screen was opened; null for the implicit first screen, which takes the time of its first entry
-    function newScreen(name, time) {
+    // uuid: the new_screen request that opened the screen, so closing it can drop it from the session history
+    function newScreen(name, time, uuid) {
         // An empty current screen is reused instead of being archived (clearAll() followed by newScreen())
         if (current && screens[screens.length - 1] === current && !current.el.children.length) {
             current.name = name || '';
             current.time = time;
+            current.uuid = uuid;
             showScreen(screens.length - 1);
             return;
         }
@@ -384,7 +562,7 @@
         const el = document.createElement('section');
         el.className = 'screen';
         feed.appendChild(el);
-        screens.push({ name: name || '', el: el, time: time });
+        screens.push({ name: name || '', el: el, time: time, uuid: uuid });
         // Old screens are dropped together with their entries to keep the page light
         while (screens.length > MAX_SCREENS) dropScreen(screens.shift());
         showScreen(screens.length - 1);
@@ -399,9 +577,11 @@
         current = screens[index];
         screens.forEach(function (s) { s.el.hidden = s !== current; });
         // Screens are tabs (projects are chips): ray()->newScreen() history of the session, newest on the right
-        screenBar.innerHTML = '<span class="bar-caption">Screens</span>' + screens.map(function (s, i) {
+        screenBar.innerHTML = '<span class="bar-icon" title="Screens">' + SCREENS_ICON + '</span>' + screens.map(function (s, i) {
             return '<button type="button" class="screen-tab' + (i === index ? ' active' : '') + '" data-screen="' + i + '">'
-                + esc(s.name || 'Screen ' + (i + 1)) + '<span class="screen-time">' + esc(s.time || '') + '</span></button>';
+                + esc(s.name || 'Screen ' + (i + 1)) + '<span class="screen-time">' + esc(s.time || '') + '</span>'
+                + (screens.length > 1 ? '<span class="screen-close" data-close-screen="' + i + '" title="Close screen">×</span>' : '')
+                + '</button>';
         }).join('') + '<button type="button" class="screen-add" title="New screen" data-new-screen>+</button>';
         screenBar.hidden = screens.length < 2 && !current.name;
         const activeTab = screenBar.querySelector('.active');
@@ -434,7 +614,9 @@
             + (origin && origin.file ? fileLink(origin.file, origin.line_number) : '')
             + '<span>' + esc(time) + '</span>'
             + '</div></div>'
-            + '<button class="icon entry-copy" type="button" title="Copy as Markdown">' + COPY_ICON + '</button>';
+            + '<div class="entry-actions">'
+            + '<button class="icon entry-open" type="button" title="Open in editor">' + OPEN_ICON + '</button>'
+            + '<button class="icon entry-copy" type="button" title="Copy as Markdown">' + COPY_ICON + '</button></div>';
         if (source) entry.dataset.session = source.id;
         entry.dataset.uuid = uuid;
         entries.set(uuid, entry);
@@ -476,17 +658,36 @@
         entry.classList.toggle('hidden-by-filter', !(textOk && colorOk));
     }
 
+    function filtersActive() {
+        return activeColors.size > 0 || filter.value.trim() !== '';
+    }
+
     function updateCount() {
         const n = current ? current.el.querySelectorAll('.entry').length : 0;
-        count.textContent = n ? String(n) : '';
+        const shown = current ? current.el.querySelectorAll('.entry:not(.hidden-by-filter)').length : 0;
+        const filtered = filtersActive() && shown < n;
+        count.textContent = !n ? '' : (filtered ? shown + ' of ' : '') + n + (n === 1 ? ' entry' : ' entries');
+        // Filters hid everything on this screen: say so instead of showing an empty feed
+        noMatch.hidden = !(n > 0 && shown === 0 && filtersActive());
+        const q = showQueryStats && current && current.queries;
+        queryStats.textContent = q ? q.count + (q.count === 1 ? ' query' : ' queries') + (q.time ? ' · ' + formatMs(q.time) : '') : '';
+        queryStats.hidden = !q;
+        queryStats.classList.toggle('warn', !!(q && q.issues));
         empty.hidden = n > 0;
+    }
+
+    // Text of every payload of an entry with its language (php, sql, json, ...)
+    function entryParts(entry) {
+        return entry.copyParts.map(function (part) {
+            const body = part.text !== null ? part.text : part.el.innerText;
+            return { lang: part.lang, text: String(body).replace(/[ \t]+$/gm, '').replace(/\s+$/, '') };
+        });
     }
 
     // Markdown fenced blocks keep syntax highlighting when pasted into chats and issue trackers
     function copyEntry(entry, button) {
-        const blocks = entry.copyParts.map(function (part) {
-            const body = part.text !== null ? part.text : part.el.innerText;
-            return '```' + part.lang + '\n' + String(body).replace(/[ \t]+$/gm, '').replace(/\s+$/, '') + '\n```';
+        const blocks = entryParts(entry).map(function (part) {
+            return '```' + part.lang + '\n' + part.text + '\n```';
         });
         const origin = entry.querySelector('.entry-meta a[data-file]');
         const header = origin ? origin.textContent + '\n' : '';
@@ -503,7 +704,7 @@
     function setPaused(value) {
         paused = value;
         pauseButton.classList.toggle('on', paused);
-        pauseButton.title = paused ? 'Resume feed' : 'Pause feed';
+        pauseButton.title = withShortcut(paused ? 'Resume feed' : 'Pause feed', 'pause');
         pausedBar.hidden = !paused;
         if (paused) return;
 
@@ -529,7 +730,7 @@
     }
 
     function show(request, source) {
-        const nearBottom = window.innerHeight + window.scrollY >= document.body.scrollHeight - 40;
+        const nearBottom = feed.scrollTop + feed.clientHeight >= feed.scrollHeight - 40;
         // Sending to an existing Ray instance replaces what it showed (ray()->send(), count())
         const existed = entries.has(request.uuid);
         let replaced = false;
@@ -543,7 +744,7 @@
                     clearAll();
                     return;
                 case 'new_screen':
-                    newScreen(content.name, receivedTime(request));
+                    newScreen(content.name, receivedTime(request), request.uuid);
                     return;
                 case 'screen_color':
                     document.body.style.background = content.color || '';
@@ -573,6 +774,7 @@
             const entry = entryFor(request.uuid, payload.origin, source, receivedTime(request));
             entry.searchText = null;
             const result = render(type, content, entry);
+            if (type === 'executed_query') trackQuery(entry, content);
             if (!result) {
                 applyFilter(entry);
                 return;
@@ -601,7 +803,7 @@
         });
 
         updateCount();
-        if (nearBottom) window.scrollTo(0, document.body.scrollHeight);
+        if (nearBottom) feed.scrollTop = feed.scrollHeight;
     }
 
     document.addEventListener('click', function (e) {
@@ -652,6 +854,22 @@
             return;
         }
 
+        // Big entries are easier to read in an editor tab next to the code
+        const openButton = e.target.closest('.entry-open');
+        if (openButton) {
+            const entry = openButton.closest('.entry');
+            const parts = entryParts(entry);
+            const langs = parts.map(function (p) { return p.lang; }).filter(Boolean);
+            const origin = entry.querySelector('.entry-meta a[data-file]');
+            post({
+                action: 'openText',
+                text: parts.map(function (p) { return p.text; }).join('\n\n'),
+                lang: langs.length && langs.every(function (l) { return l === langs[0]; }) ? langs[0] : '',
+                title: entry.querySelector('.entry-label').textContent || (origin ? origin.textContent : '')
+            });
+            return;
+        }
+
         const copyButton = e.target.closest('.entry-copy');
         if (copyButton) {
             copyEntry(copyButton.closest('.entry'), copyButton);
@@ -665,6 +883,13 @@
             lock.classList.add('released');
             lock.querySelectorAll('button').forEach(function (b) { b.disabled = true; });
             lock.querySelector('span').textContent = lockButton.dataset.lockAction === 'stop' ? 'Stopped' : 'Continued';
+            return;
+        }
+
+        const fold = e.target.closest('.fold-toggle');
+        if (fold) {
+            const open = fold.closest('.foldable').classList.toggle('open');
+            fold.textContent = open ? fold.dataset.less : fold.dataset.more;
             return;
         }
 
@@ -692,8 +917,78 @@
     pauseButton.addEventListener('click', function () { setPaused(!paused); });
     document.getElementById('resume').addEventListener('click', function () { setPaused(false); });
 
+    function screenTitle(screen, index) {
+        return '"' + (screen.name || 'Screen ' + (index + 1)) + '"';
+    }
+
+    // Archive of cleared output (newest first); Restore puts it back where it was
+    const archivePanel = document.getElementById('archive');
+
+    function archive(list) {
+        archivePanel.innerHTML = '<div class="archive-title">Cleared output</div>' + (list.length ? '<div class="archive-list">' + list.map(function (item) {
+            return '<div class="archive-item" data-restore="' + esc(item.id) + '" data-session="' + esc(item.session) + '" title="Restore">'
+                + '<div class="archive-text"><b>' + esc(item.title) + '</b><span class="muted">'
+                + esc(new Date(item.time).toLocaleTimeString(timeFormat.locale, { hour12: timeFormat.hour12 }))
+                + ' · ' + item.count + (item.count === 1 ? ' entry' : ' entries')
+                + (allProjects ? ' · ' + esc(item.project) : '') + '</span></div>'
+                + '<span class="archive-restore">Restore</span></div>';
+        }).join('') + '</div>' : '<div class="archive-empty muted">Nothing cleared yet. What Clear removes can be restored here.</div>');
+        archivePanel.hidden = false;
+        placeArchive();
+    }
+
+    // Under the history button, inside the panel; the caret points at the button
+    function placeArchive() {
+        const button = document.getElementById('history');
+        const center = button.offsetLeft + button.offsetWidth / 2;
+        const width = archivePanel.offsetWidth;
+        const left = Math.max(8, Math.min(button.offsetLeft - 6, document.documentElement.clientWidth - width - 8));
+        archivePanel.style.setProperty('--archive-left', left + 'px');
+        archivePanel.style.setProperty('--caret-x', (center - left) + 'px');
+    }
+
+    document.getElementById('history').addEventListener('click', function () {
+        if (archivePanel.hidden) post({ action: 'archive' }); else archivePanel.hidden = true;
+    });
+
+    archivePanel.addEventListener('click', function (e) {
+        const restore = e.target.closest('[data-restore]');
+        if (!restore) return;
+        post({ action: 'restore', id: Number(restore.dataset.restore), session: restore.dataset.session });
+        archivePanel.hidden = true;
+    });
+
+    // Any click elsewhere closes the list
+    document.addEventListener('mousedown', function (e) {
+        if (!archivePanel.hidden && !e.target.closest('#archive, #history')) archivePanel.hidden = true;
+    });
+
+    // Closing a screen drops it with its entries; the IDE removes them from the session history too
+    function closeScreen(index) {
+        const screen = screens[index];
+        const uuids = Array.prototype.map.call(screen.el.querySelectorAll('.entry'), function (entry) { return entry.dataset.uuid; });
+        if (screen.uuid) uuids.push(screen.uuid);
+        post({ action: 'removeRequests', uuids: uuids, title: screenTitle(screen, index) + ' closed' });
+        dropScreen(screen);
+        screens.splice(index, 1);
+        showScreen(screen === current ? Math.min(index, screens.length - 1) : screens.indexOf(current));
+    }
+
+    // Removes the entries of the current screen but keeps the screen; the IDE forgets them too
+    function clearScreen() {
+        const uuids = Array.prototype.map.call(current.el.querySelectorAll('.entry'), function (entry) { return entry.dataset.uuid; });
+        if (uuids.length) post({ action: 'removeRequests', uuids: uuids, title: screenTitle(current, screens.indexOf(current)) + ' cleared' });
+        uuids.forEach(function (uuid) { entries.delete(uuid); });
+        current.el.innerHTML = '';
+        current.queries = null;
+        updateCount();
+        repaintAll();
+    }
+
     screenBar.addEventListener('click', function (e) {
         if (e.target.closest('[data-new-screen]')) return post({ action: 'newScreen' });
+        const close = e.target.closest('[data-close-screen]');
+        if (close) return closeScreen(parseInt(close.dataset.closeScreen, 10));
         const tab = e.target.closest('[data-screen]');
         if (tab) showScreen(parseInt(tab.dataset.screen, 10));
     });
@@ -710,12 +1005,16 @@
         if (activeColors.has(color)) activeColors.delete(color); else activeColors.add(color);
         dot.classList.toggle('active', activeColors.has(color));
         entries.forEach(applyFilter);
+        updateCount();
     });
 
     let filterTimer = 0;
     filter.addEventListener('input', function () {
         clearTimeout(filterTimer);
-        filterTimer = setTimeout(function () { entries.forEach(applyFilter); }, 120);
+        filterTimer = setTimeout(function () {
+            entries.forEach(applyFilter);
+            updateCount();
+        }, 120);
     });
 
     function toggleSearch(open) {
@@ -726,10 +1025,19 @@
         } else if (filter.value) {
             filter.value = '';
             entries.forEach(applyFilter);
+            updateCount();
         }
     }
 
     searchButton.addEventListener('click', function () { toggleSearch(filter.hidden); });
+
+    document.getElementById('clear-filters').addEventListener('click', function () {
+        activeColors.clear();
+        document.querySelectorAll('#colors .dot').forEach(function (dot) { dot.classList.remove('active'); });
+        filter.value = '';
+        entries.forEach(applyFilter);
+        updateCount();
+    });
     filter.addEventListener('keydown', function (e) {
         if (e.key === 'Escape') toggleSearch(false);
     });
@@ -809,7 +1117,7 @@
     // projectCount: the bar is only useful with two or more open projects
     function sessions(list, projectCount) {
         allProjects = list.some(function (s) { return s.id === 'all' && s.viewed; });
-        sessionBar.innerHTML = '<span class="bar-caption">Projects</span>' + list.map(function (s) {
+        sessionBar.innerHTML = '<span class="bar-icon" title="Projects">' + PROJECTS_ICON + '</span>' + list.map(function (s) {
             const all = s.id === 'all';
             return '<button type="button" class="session-chip' + (s.viewed ? ' active' : '') + (all ? ' all' : '') + '"'
                 + ' data-session="' + esc(s.id) + '"' + (all ? '' : ' style="--pc:' + projectColor(s.id) + '"') + '>'
@@ -820,6 +1128,18 @@
         sessionBar.hidden = projectCount < 2;
         const active = sessionBar.querySelector('.active');
         if (active) active.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    }
+
+    // A click on a gutter icon in the editor: bring the entry into view, on whichever screen it is
+    function reveal(uuid) {
+        const entry = entries.get(uuid);
+        if (!entry) return;
+        const index = screens.findIndex(function (s) { return s.el.contains(entry); });
+        if (index >= 0 && screens[index] !== current) showScreen(index);
+        entry.scrollIntoView({ block: 'center' });
+        entry.classList.remove('flash');
+        void entry.offsetWidth;
+        entry.classList.add('flash');
     }
 
     // Drops everything shown before switching to another session; the IDE replays the new one
@@ -841,9 +1161,42 @@
         Object.keys(vars).forEach(function (name) { root.style.setProperty(name, vars[name]); });
     }
 
-    // Settings that are not part of the theme
+    // Keyboard actions of the IDE (Tools | Dumpie in the keymap)
+    function command(name) {
+        const index = screens.indexOf(current);
+        switch (name) {
+            case 'clearAll': document.getElementById('clear').click(); break;
+            case 'clearScreen': clearScreen(); break;
+            case 'newScreen': post({ action: 'newScreen' }); break;
+            case 'pause': setPaused(!paused); break;
+            case 'search': toggleSearch(true); break;
+            case 'nextScreen': if (index < screens.length - 1) showScreen(index + 1); break;
+            case 'previousScreen': if (index > 0) showScreen(index - 1); break;
+        }
+    }
+
+    let shortcuts = {};
+
+    function withShortcut(title, name) {
+        return shortcuts[name] ? title + ' (' + shortcuts[name] + ')' : title;
+    }
+
+    // Settings that are not part of the theme. Unpinned bars move into the feed and scroll away with it.
     function options(o) {
-        document.getElementById('top').classList.toggle('pinned', o.pinBars);
+        const bars = document.getElementById('bars');
+        if (o.pinBars) document.getElementById('top').appendChild(bars); else feed.insertBefore(bars, feed.firstChild);
+        timeFormat = { locale: o.locale || undefined, hour12: typeof o.hour12 === 'boolean' ? o.hour12 : undefined };
+        if (typeof o.slowQueryMs === 'number') slowQueryMs = o.slowQueryMs;
+        if (typeof o.repeatedQueries === 'boolean') markRepeated = o.repeatedQueries;
+        if (typeof o.queryStats === 'boolean') showQueryStats = o.queryStats;
+        if (o.shortcuts) {
+            shortcuts = o.shortcuts;
+            pauseButton.title = withShortcut(paused ? 'Resume feed' : 'Pause feed', 'pause');
+            searchButton.title = withShortcut('Search', 'search');
+            document.getElementById('new-screen').title = withShortcut('New screen', 'newScreen');
+            document.getElementById('clear').title = withShortcut('Clear all', 'clearAll');
+        }
+        updateCount();
     }
 
     newScreen('', null);
@@ -852,5 +1205,5 @@
         items.forEach(function (item) { receive(item.r, item.s); });
     }
 
-    window.dumpie = { receive: receive, receiveBatch: receiveBatch, theme: theme, options: options, sessions: sessions, reset: reset, status: status };
+    window.dumpie = { receive: receive, receiveBatch: receiveBatch, theme: theme, options: options, sessions: sessions, reset: reset, status: status, reveal: reveal, command: command, archive: archive };
 })();

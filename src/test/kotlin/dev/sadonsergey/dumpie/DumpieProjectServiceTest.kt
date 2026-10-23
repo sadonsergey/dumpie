@@ -89,6 +89,77 @@ class DumpieProjectServiceTest : BasePlatformTestCase() {
         assertEquals("r5", uuids().first())
     }
 
+    fun testClosedScreenLeavesTheHistory() {
+        session.receive(request("a", "log"))
+        session.receive(request("s", "new_screen"))
+        session.receive(request("b", "log"))
+        session.receive(request("b", "color"))
+        session.receive(request("c", "log"))
+        session.removeRequests(setOf("s", "b"), "\"Checkout\" closed")
+        session.attach(listener)
+        assertEquals(listOf("a", "c"), uuids())
+    }
+
+    fun testClearedOutputCanBeRestored() {
+        session.receive(request("a", "log"))
+        session.receive(request("b", "log"))
+        session.clear()
+        session.receive(request("c", "log"))
+
+        // The archive lives as long as the session, so earlier tests may have left items: the newest is first
+        val item = session.archived().first()
+        assertEquals("Clear all", item.title)
+        assertEquals(2, item.count)
+        assertTrue(session.restore(item.id))
+        assertTrue(session.archived().none { it.id == item.id })
+
+        // Restored output goes back to where it was
+        session.attach(listener)
+        assertEquals(listOf("a", "b", "c"), uuids())
+    }
+
+    fun testClearAllFromPhpIsArchivedAndUndone() {
+        session.receive(request("a", "log"))
+        session.receive(request("x", "clear_all"))
+        session.receive(request("b", "log"))
+        val item = session.archived().first()
+        assertEquals("Cleared from PHP", item.title)
+        session.restore(item.id)
+        session.attach(listener)
+        assertEquals(listOf("a", "b"), uuids())
+    }
+
+    fun testClosedScreenIsArchivedWithItsTitle() {
+        session.receive(request("a", "log"))
+        session.receive(request("s", "new_screen"))
+        session.receive(request("b", "log"))
+        session.receive(request("b", "color"))
+        session.removeRequests(setOf("s", "b"), "\"Checkout\" closed")
+        val item = session.archived().first()
+        assertEquals("\"Checkout\" closed", item.title)
+        assertEquals(1, item.count)
+        session.restore(item.id)
+        session.attach(listener)
+        assertEquals(listOf("a", "s", "b", "b"), uuids())
+    }
+
+    fun testArchiveKeepsTheLastTenClears() {
+        repeat(12) {
+            session.receive(request("r$it", "log"))
+            session.clear()
+        }
+        assertEquals(10, session.archived().size)
+        assertFalse(session.restore(-1))
+    }
+
+    fun testNothingToArchiveWhenEmpty() {
+        session.clear()
+        val newest = session.archived().firstOrNull()
+        session.receive(request("s", "new_screen"))
+        session.clear()
+        assertSame(newest, session.archived().firstOrNull())
+    }
+
     fun testClearEmptiesHistory() {
         session.receive(request("a", "log"))
         session.clear()

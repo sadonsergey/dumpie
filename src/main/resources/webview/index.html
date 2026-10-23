@@ -5,7 +5,7 @@
     <style>/*CSS*/</style>
 </head>
 <body>
-<div id="top" class="top pinned">
+<div id="top" class="top">
 <header class="toolbar">
     <button id="pause" class="icon" type="button" title="Pause feed">
         <svg class="i-pause" viewBox="0 0 16 16"><rect x="3.5" y="2.5" width="3" height="11" rx="1"/><rect x="9.5" y="2.5" width="3" height="11" rx="1"/></svg>
@@ -20,9 +20,13 @@
     <button id="clear" class="icon" type="button" title="Clear all">
         <svg viewBox="0 0 16 16"><path d="M12.9 1.6l1.1 1.1-4.3 4.3.9.9c.6.6.6 1.5 0 2.1L7.3 13.3 2.7 8.7 6 5.4c.6-.6 1.5-.6 2.1 0l.9.9 3.9-4.7zM2 9.4l4.6 4.6-.6.6c-.4.4-1 .4-1.4 0L1.4 11.4c-.4-.4-.4-1 0-1.4l.6-.6z"/></svg>
     </button>
+    <button id="history" class="icon" type="button" title="Cleared output">
+        <svg viewBox="0 0 16 16"><path d="M8 1.5a6.5 6.5 0 1 1-6.33 8h1.55A5 5 0 1 0 4.46 4.46L6 6H2V2l1.4 1.4A6.48 6.48 0 0 1 8 1.5zm-.75 3h1.5v3.19l2.28 2.28-1.06 1.06-2.72-2.72V4.5z"/></svg>
+    </button>
     <input id="filter" type="search" placeholder="Search…" autocomplete="off" hidden>
     <span class="spacer"></span>
-    <span id="count" class="muted count"></span>
+    <span id="count" class="muted count" title="Entries on this screen"></span>
+    <span id="query-stats" class="muted count" title="SQL queries on this screen and their total time" hidden></span>
     <div id="colors" class="colors">
         <button class="dot color-green" data-color="green" title="Green"></button>
         <button class="dot color-orange" data-color="orange" title="Orange"></button>
@@ -32,14 +36,22 @@
         <button class="dot color-gray" data-color="gray" title="Gray"></button>
     </div>
 </header>
-<nav id="session-bar" class="session-bar" hidden></nav>
-<div id="paused-bar" class="paused-bar" hidden>
-    <span>Feed paused · <b id="pending">0</b> new</span>
-    <button id="resume" type="button">Resume</button>
+<div id="archive" class="archive" hidden></div>
+<div id="bars">
+    <nav id="session-bar" class="session-bar" hidden></nav>
+    <div id="paused-bar" class="paused-bar" hidden>
+        <span>Feed paused · <b id="pending">0</b> new</span>
+        <button id="resume" type="button">Resume</button>
+    </div>
+    <nav id="screen-bar" class="screen-bar" hidden></nav>
 </div>
-<nav id="screen-bar" class="screen-bar" hidden></nav>
 </div>
 <main id="feed">
+    <div id="no-match" class="empty" hidden>
+        <div class="empty-title">Nothing matches the filters</div>
+        <div class="empty-lead muted">Try another color or search text.</div>
+        <div class="guide-links"><button id="clear-filters" type="button">Clear filters</button></div>
+    </div>
     <div id="empty" class="empty">
         <div class="empty-title">Nothing caught yet</div>
         <div id="guide-lead" class="empty-lead muted">Debug output will appear here.</div>

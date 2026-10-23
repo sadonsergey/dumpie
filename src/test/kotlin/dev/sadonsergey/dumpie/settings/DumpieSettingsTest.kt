@@ -16,6 +16,12 @@ class DumpieSettingsTest {
         assertEquals(9912, state.dumpPort)
         assertTrue(state.showToolWindowOnMessage)
         assertTrue(state.pinBars)
+        assertTrue(state.showGutterIcons)
+        assertTrue(state.whiteBackgroundInLightThemes)
+        assertTrue(state.showQueryStats)
+        assertTrue(state.markRepeatedQueries)
+        assertTrue(state.markSlowQueries)
+        assertEquals(100, state.slowQueryMs)
     }
 
     @Test

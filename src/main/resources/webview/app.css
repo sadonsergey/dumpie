@@ -11,7 +11,7 @@
     --mono-size: 12px;
 
     --hover: color-mix(in srgb, var(--fg) 4%, var(--bg));
-    --box: color-mix(in srgb, var(--fg) 4%, var(--bg));
+    --box: color-mix(in srgb, var(--fg) 2.5%, var(--bg));
     --box-border: color-mix(in srgb, var(--fg) 15%, var(--bg));
     --input-border: color-mix(in srgb, var(--fg) 22%, var(--bg));
     --link: var(--muted);
@@ -23,6 +23,9 @@
     --blue: #4c8df6;
     --gray: #868a91;
 
+    /* Toolbar, project bar and screen bar share one height (border included) */
+    --bar-h: 35px;
+
     /* Syntax colors for dumps; overridden with the editor color scheme at runtime */
     --syn-string: #6aab73;
     --syn-number: #2aacb8;
@@ -30,6 +33,8 @@
     --syn-field: #c77dbb;
     --syn-class: #bcbec4;
     --syn-meta: #b3ae60;
+    --syn-function: #56a8f5;
+    --syn-comment: #7a7e85;
 }
 
 :root[data-theme="light"] {
@@ -39,6 +44,8 @@
     --syn-field: #871094;
     --syn-class: #000000;
     --syn-meta: #9e880d;
+    --syn-function: #00627a;
+    --syn-comment: #8c8c8c;
     --green: #3f9a45;
     --orange: #d36b2c;
     --red: #d8394a;
@@ -71,22 +78,19 @@ code, pre, .mono { font-family: var(--mono-font); font-size: var(--mono-size); }
     display: flex;
     gap: 4px;
     align-items: center;
-    padding: 6px 10px;
+    height: var(--bar-h);
+    padding: 0 10px;
     background: var(--bg);
     border-bottom: 1px solid var(--border);
 }
 
 .spacer { flex: 1; }
 
-/* Toolbar with the session, pause and screen bars: pinned as a whole unless turned off in the settings */
-.top { display: contents; }
-.top.pinned {
-    display: block;
-    position: sticky;
-    top: 0;
-    z-index: 10;
-    background: var(--bg);
-}
+/* Only the feed scrolls, so its scrollbar starts below the toolbar and the pinned bars */
+html, body { height: 100%; }
+body { display: flex; flex-direction: column; overflow: hidden; }
+.top { flex: none; position: relative; z-index: 10; background: var(--bg); }
+#feed { flex: 1; min-height: 0; overflow-y: auto; }
 
 .toolbar input {
     flex: 1;
@@ -125,7 +129,65 @@ button.icon svg { width: 15px; height: 15px; fill: currentColor; }
 #pause.on .i-play { display: inline; }
 #pause.on { color: var(--orange); }
 
-.count { margin-right: 6px; font-size: .85em; }
+.count { margin-right: 6px; font-size: .85em; white-space: nowrap; }
+#query-stats[hidden] { display: none; }
+#query-stats::before { content: "· "; color: var(--muted); }
+#query-stats.warn { color: var(--orange); }
+
+/* Archive of cleared output: a dropdown under its toolbar button (left and caret position set in app.js) */
+.archive {
+    position: absolute;
+    top: calc(var(--bar-h) + 4px);
+    left: var(--archive-left, 10px);
+    z-index: 20;
+    width: min(300px, calc(100% - 20px));
+    padding: 4px;
+    background: var(--bg);
+    border: 1px solid var(--box-border);
+    border-radius: 8px;
+    box-shadow: 0 8px 28px rgba(0, 0, 0, .2);
+}
+.archive::before {
+    content: "";
+    position: absolute;
+    top: -6px;
+    left: var(--caret-x, 16px);
+    width: 10px;
+    height: 10px;
+    background: var(--bg);
+    border-left: 1px solid var(--box-border);
+    border-top: 1px solid var(--box-border);
+    transform: translateX(-50%) rotate(45deg);
+}
+.archive[hidden] { display: none; }
+.archive-title { padding: 4px 8px 6px; font-size: .75em; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); }
+.archive-list { max-height: 50vh; overflow-y: auto; }
+.archive-item { display: flex; align-items: center; gap: 10px; padding: 5px 8px; border-radius: 5px; cursor: pointer; }
+.archive-item:hover { background: var(--hover); }
+.archive-text { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.35; }
+.archive-text b { font-weight: 600; font-size: .92em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.archive-text span { font-size: .8em; }
+.archive-restore { flex: none; font-size: .8em; color: var(--muted); }
+.archive-item:hover .archive-restore { color: var(--accent); }
+.archive-empty { padding: 2px 8px 6px; font-size: .88em; }
+
+/* SQL insights: repeated statements (possible N+1) and slow queries */
+.query-flag {
+    display: inline-block;
+    margin-bottom: 5px;
+    padding: 0 7px;
+    font-size: .8em;
+    line-height: 16px;
+    border: 1px solid;
+    border-radius: 9px;
+    cursor: help;
+}
+.query-flag.repeated { color: var(--orange); }
+.query-flag.slow { color: var(--red); }
+
+/* An entry revealed from a gutter icon in the editor */
+.entry.flash { animation: flash 1.4s ease-out; }
+@keyframes flash { from { box-shadow: 0 0 0 2px var(--accent); } to { box-shadow: 0 0 0 2px transparent; } }
 
 .colors { display: flex; gap: 6px; padding-left: 8px; border-left: 1px solid var(--border); }
 
@@ -141,6 +203,7 @@ button.icon svg { width: 15px; height: 15px; fill: currentColor; }
 
 .dot:hover { background: color-mix(in srgb, var(--c) 35%, transparent); }
 .dot.active { background: var(--c); }
+.dot:focus:not(:focus-visible) { outline: none; }
 
 .color-green { --c: var(--green); }
 .color-orange { --c: var(--orange); }
@@ -179,7 +242,8 @@ button:disabled { opacity: .5; cursor: default; }
 /* Screens of a session: underlined tabs, unlike the project chips above them */
 .screen-bar {
     display: flex;
-    gap: 18px;
+    gap: 12px;
+    height: var(--bar-h);
     padding: 0 14px;
     border-bottom: 1px solid var(--border);
     overflow-x: auto;
@@ -190,11 +254,11 @@ button:disabled { opacity: .5; cursor: default; }
 .screen-tab {
     flex: 0 0 auto;
     display: inline-flex;
-    align-items: baseline;
+    align-items: center;
     gap: 6px;
     height: auto;
     margin-bottom: -1px;
-    padding: 7px 0 6px;
+    padding: 0;
     color: var(--muted);
     background: none;
     border: 0;
@@ -207,6 +271,8 @@ button:disabled { opacity: .5; cursor: default; }
 .screen-tab.active { color: var(--fg); font-weight: 600; border-bottom-color: var(--accent); }
 .screen-add {
     flex: 0 0 auto;
+    margin-left: -8px;
+    align-self: center;
     height: auto;
     padding: 4px 6px;
     color: var(--muted);
@@ -217,6 +283,17 @@ button:disabled { opacity: .5; cursor: default; }
 }
 .screen-add:hover { color: var(--fg); }
 .screen-time { font-size: .85em; font-weight: 400; color: var(--muted); font-variant-numeric: tabular-nums; }
+.screen-close {
+    margin-left: -2px;
+    padding: 0 3px;
+    font-weight: 400;
+    color: var(--muted);
+    border-radius: 3px;
+    display: none;
+}
+/* Only the active screen can be closed: the bar stays compact and nothing shifts on hover */
+.screen-tab.active .screen-close { display: inline; }
+.screen-close:hover { color: var(--fg); background: var(--hover); }
 
 /* Feed */
 
@@ -253,10 +330,16 @@ button:disabled { opacity: .5; cursor: default; }
 
 .entry:not([class*="color-"]) { --c: var(--muted); }
 
+/* Entries are cards with a gap between them, so a run of same-colored entries does not merge into one block */
+.screen { padding: 8px 8px 2px; }
+
 .entry {
     position: relative;
+    margin-bottom: 6px;
     padding: 12px 14px 12px 16px;
-    border-bottom: 1px solid var(--border);
+    border: 1px solid color-mix(in srgb, var(--fg) 12%, var(--bg));
+    border-radius: 6px;
+    overflow: hidden;
 }
 
 /* Left edge carries the entry color; uncolored entries show a neutral one on hover. Click collapses. */
@@ -298,8 +381,9 @@ button:disabled { opacity: .5; cursor: default; }
 .entry-body { overflow-x: auto; cursor: text; }
 .entry-body a, .entry-body summary, .entry-body button, .entry-body .sf-dump-toggle { cursor: pointer; }
 
-.entry-copy { position: absolute; top: 8px; right: 8px; opacity: 0; transition: opacity .12s; }
-.entry:hover .entry-copy, .entry-copy.done { opacity: 1; }
+.entry-actions { position: absolute; top: 8px; right: 8px; display: flex; gap: 2px; }
+.entry-actions .icon { opacity: 0; transition: opacity .12s; background: var(--bg); }
+.entry:hover .entry-actions .icon, .entry-copy.done { opacity: 1; }
 .entry-copy.done { color: var(--green); }
 .entry.collapsed .entry-body { display: none; }
 .entry.size-lg .entry-body { font-size: 1.4em; }
@@ -348,9 +432,12 @@ table.kv pre.sf-dump { padding: 0; background: none !important; }
 
 /* Errors: exceptions and error/warning log entries */
 
-.entry.alert.color-red, .entry.alert.color-orange { background: color-mix(in srgb, var(--c) 11%, var(--bg)); }
+.entry.alert.color-red, .entry.alert.color-orange {
+    background: color-mix(in srgb, var(--c) 4%, var(--bg));
+    border-color: color-mix(in srgb, var(--c) 30%, var(--bg));
+}
 
-.entry.alert.color-red .entry-label, .entry.alert.color-orange .entry-label { background: color-mix(in srgb, var(--c) 18%, transparent); }
+.entry.alert.color-red .entry-label, .entry.alert.color-orange .entry-label { background: color-mix(in srgb, var(--c) 10%, transparent); }
 
 .alert-message { font-size: 1.08em; line-height: 1.45; margin-bottom: 8px; white-space: pre-wrap; word-break: break-word; }
 .alert-message:last-child { margin-bottom: 0; }
@@ -370,8 +457,29 @@ table.kv pre.sf-dump { padding: 0; background: none !important; }
 .snippet .line { display: flex; white-space: pre; line-height: 18px; }
 .snippet .ln { flex: 0 0 auto; width: 44px; padding-right: 12px; text-align: right; color: var(--muted); user-select: none; }
 .snippet .code { padding-right: 12px; }
-.snippet .hl { background: color-mix(in srgb, var(--red) 22%, transparent); }
+.snippet .hl { background: color-mix(in srgb, var(--red) 12%, transparent); }
 .snippet .hl .ln { color: var(--red); }
+.syn-keyword { color: var(--syn-keyword); }
+.syn-string { color: var(--syn-string); }
+.syn-number { color: var(--syn-number); }
+.syn-var { color: var(--syn-field); }
+.syn-field { color: var(--syn-field); }
+.syn-function { color: var(--syn-function); }
+.syn-comment { color: var(--syn-comment); font-style: italic; }
+
+/* Long stack traces and log context: the rest opens with a button */
+.foldable:not(.open) .fold-rest { display: none; }
+.fold-toggle {
+    margin-top: 4px;
+    padding: 0;
+    font: inherit;
+    font-size: .85em;
+    color: var(--accent);
+    background: none;
+    border: 0;
+    cursor: pointer;
+}
+.fold-toggle:hover { text-decoration: underline; }
 
 .frames { list-style: none; margin: 4px 0 0; padding: 0; font-size: .92em; }
 .frames li { display: flex; flex-wrap: wrap; gap: 0 8px; padding: 2px 0; }
@@ -440,6 +548,11 @@ pre.sf-dump .sf-dump-meta { color: var(--syn-meta) !important; }
 pre.sf-dump .sf-dump-ref, pre.sf-dump .sf-dump-ellipsis, pre.sf-dump a { color: var(--muted) !important; }
 
 /* Captions in front of the project chips and the screen tabs */
+.bar-icon { flex: 0 0 auto; align-self: center; display: inline-flex; margin-right: -6px; color: var(--muted); }
+.bar-icon svg { width: 14px; height: 14px; fill: currentColor; }
+/* The session bar has less side padding than the screen bar: both icons line up */
+.session-bar .bar-icon { margin: 0 2px 0 4px; }
+
 .bar-caption {
     flex: 0 0 auto;
     align-self: center;
@@ -455,8 +568,10 @@ pre.sf-dump .sf-dump-ref, pre.sf-dump .sf-dump-ellipsis, pre.sf-dump a { color: 
 /* Session bar: one chip per open project */
 .session-bar {
     display: flex;
+    align-items: center;
     gap: 6px;
-    padding: 6px 10px;
+    height: var(--bar-h);
+    padding: 0 10px;
     border-bottom: 1px solid var(--border);
     overflow-x: auto;
     scrollbar-width: none;
@@ -469,14 +584,14 @@ pre.sf-dump .sf-dump-ref, pre.sf-dump .sf-dump-ellipsis, pre.sf-dump a { color: 
     display: inline-flex;
     flex: 0 0 auto;
     align-items: center;
-    gap: 6px;
-    height: 24px;
-    padding: 0 10px 0 8px;
+    gap: 5px;
+    height: 22px;
+    padding: 0 9px 0 7px;
     color: var(--fg);
     background: transparent;
     border: 1px solid var(--box-border);
-    border-radius: 12px;
-    font-size: .92em;
+    border-radius: 11px;
+    font-size: .86em;
     white-space: nowrap;
 }
 .session-chip:hover { background: var(--hover); }
@@ -490,14 +605,14 @@ pre.sf-dump .sf-dump-ref, pre.sf-dump .sf-dump-ellipsis, pre.sf-dump a { color: 
 }
 .session-chip.all.active { --pc: var(--fg); background: var(--box); border-color: var(--input-border); }
 .session-chip .unread {
-    min-width: 16px;
-    height: 16px;
+    min-width: 15px;
+    height: 15px;
     margin-right: -4px;
-    padding: 0 5px;
+    padding: 0 4px;
     border-radius: 8px;
     font-size: .75em;
     font-weight: 700;
-    line-height: 16px;
+    line-height: 15px;
     text-align: center;
     color: #fff;
     background: var(--pc);
@@ -514,7 +629,7 @@ pre.sf-dump .sf-dump-ref, pre.sf-dump .sf-dump-ellipsis, pre.sf-dump a { color: 
     font-size: .8em;
     line-height: 18px;
     color: var(--fg);
-    background: color-mix(in srgb, var(--pc) 18%, transparent);
+    background: color-mix(in srgb, var(--pc) 12%, transparent);
     border-radius: 9px;
 }
 .entry-project i { width: 7px; height: 7px; border-radius: 50%; background: var(--pc); }

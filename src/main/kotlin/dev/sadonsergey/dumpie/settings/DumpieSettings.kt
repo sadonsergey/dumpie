@@ -18,6 +18,12 @@ class DumpieSettings : SimplePersistentStateComponent<DumpieSettings.State>(Stat
         var dumpPort by property(9912)
         var showToolWindowOnMessage by property(true)
         var pinBars by property(true)
+        var whiteBackgroundInLightThemes by property(true)
+        var showGutterIcons by property(true)
+        var showQueryStats by property(true)
+        var markRepeatedQueries by property(true)
+        var markSlowQueries by property(true)
+        var slowQueryMs by property(100)
     }
 
     companion object {

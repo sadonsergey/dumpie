@@ -96,7 +96,7 @@ class WebviewTest {
         receive(log("a", "hello"))
         assertEquals(listOf("hello"), texts(".entry .text"))
         assertEquals(listOf("x.php:3"), texts(".entry-meta a[data-file]"))
-        assertEquals("1", page.textContent("#count"))
+        assertEquals("1 entry", page.textContent("#count"))
         assertTrue(page.locator("#empty").isHidden())
     }
 
@@ -138,6 +138,7 @@ class WebviewTest {
         }
         js("() => window.dumpie.receiveBatch($batch)")
         assertEquals(1500, count(".entry"))
+        assertEquals("1500 entries", page.textContent("#count"))
         assertEquals(0, count(".entry[data-uuid='e99']"))
         assertEquals(1, count(".entry[data-uuid='e1599']"))
     }
@@ -152,6 +153,109 @@ class WebviewTest {
         assertTrue(page.getAttribute(".entry", "class").orEmpty().contains("color-red"))
         assertEquals("failing", page.textContent(".snippet .line.hl .code"))
         assertEquals(listOf("1 vendor frame", "2 vendor frames"), texts(".vendor-group summary"))
+    }
+
+    @Test
+    fun longStackTraceShowsFirstFramesOnly() {
+        val frames = (1..10).joinToString(",") { """{"file_name":"/app/vendor/f$it.php","line_number":$it,"class":"C$it","method":"m"}""" }
+        receive(request("x", "exception", """{"class":"Boom","message":"Failed","frames":[$frames]}"""))
+        assertEquals(3, page.locator(".frames li:visible").count())
+        assertEquals("Show 7 more frames", page.textContent(".fold-toggle"))
+
+        page.click(".fold-toggle")
+        assertEquals(10, page.locator(".frames li:visible").count())
+        assertEquals("Show less", page.textContent(".fold-toggle"))
+    }
+
+    @Test
+    fun phpSnippetIsHighlighted() {
+        receive(request("x", "exception", """{"class":"Boom","message":"Failed","frames":[
+            {"file_name":"/app/Order.php","line_number":2,"snippet":[
+                {"line_number":1,"text":"/** Charges the card */"},
+                {"line_number":2,"text":"throw new RuntimeException('Card declined', ${'$'}code);"}]}]}"""))
+        assertEquals(listOf("throw", "new"), texts(".snippet .syn-keyword"))
+        assertEquals(listOf("'Card declined'"), texts(".snippet .syn-string"))
+        assertEquals(listOf("${'$'}code"), texts(".snippet .syn-var"))
+        assertEquals(listOf("/** Charges the card */"), texts(".snippet .syn-comment"))
+        // The text itself is unchanged
+        assertEquals("throw new RuntimeException('Card declined', ${'$'}code);", page.textContent(".snippet .hl .code"))
+    }
+
+    @Test
+    fun sqlAndJsonAreHighlighted() {
+        receive(request("q", "executed_query", """{"sql":"select * from `orders` where `id` = ? and status = 'paid'"}"""),
+            request("j", "json_string", """{"value":"{\"order\":1042,\"paid\":false,\"note\":\"late\"}"}"""))
+        assertEquals(listOf("select", "from", "where", "and"), texts(".entry[data-uuid='q'] .syn-keyword"))
+        assertEquals(listOf("`orders`", "`id`"), texts(".entry[data-uuid='q'] .syn-field"))
+        assertEquals(listOf("'paid'"), texts(".entry[data-uuid='q'] .syn-string"))
+        assertEquals(listOf("?"), texts(".entry[data-uuid='q'] .syn-var"))
+
+        assertEquals(listOf("\"order\"", "\"paid\"", "\"note\""), texts(".entry[data-uuid='j'] .syn-field"))
+        assertEquals(listOf("1042"), texts(".entry[data-uuid='j'] .syn-number"))
+        assertEquals(listOf("false"), texts(".entry[data-uuid='j'] .syn-keyword"))
+        assertEquals(listOf("\"late\""), texts(".entry[data-uuid='j'] .syn-string"))
+    }
+
+    private fun query(uuid: String, sql: String, ms: Double) = request(uuid, "executed_query", """{"sql":"$sql","connection_name":"mysql","time":$ms}""")
+
+    @Test
+    fun repeatedQueriesAreMarked() {
+        receive(query("a", "select * from posts where id = 1", 1.0), query("b", "select * from posts where id = 2", 1.0),
+            query("c", "select * from users where email = 'x'", 1.0), query("d", "select * from posts where id = 3", 1.5))
+        assertEquals(listOf("Repeated ×3", "Repeated ×3", "Repeated ×3"), texts(".query-flag.repeated"))
+        assertEquals(0, count(".entry[data-uuid='c'] .query-flag"))
+        assertEquals("4 queries · 4.50 ms", page.textContent("#query-stats"))
+        assertTrue(page.getAttribute("#query-stats", "class").orEmpty().contains("warn"))
+    }
+
+    @Test
+    fun slowQueriesAreMarked() {
+        receive(query("a", "select 1", 150.0), query("b", "select 2", 20.0))
+        assertEquals(listOf("Slow"), texts(".entry[data-uuid='a'] .query-flag.slow"))
+        assertEquals(0, count(".entry[data-uuid='b'] .query-flag"))
+    }
+
+    @Test
+    fun sqlInsightsCanBeTurnedOff() {
+        js("() => window.dumpie.options({pinBars: true, queryStats: false, repeatedQueries: false, slowQueryMs: 0})")
+        receive(query("a", "select * from posts where id = 1", 500.0), query("b", "select * from posts where id = 2", 500.0),
+            query("c", "select * from posts where id = 3", 500.0))
+        assertEquals(0, count(".query-flag"))
+        assertTrue(page.locator("#query-stats").isHidden())
+    }
+
+    @Test
+    fun revealBringsTheEntryIntoView() {
+        receive(log("a"), request("s", "new_screen", """{"name":"Checkout"}"""), log("b"))
+        js("() => window.dumpie.reveal('a')")
+        assertEquals(listOf("a"), page.locator(".screen:not([hidden]) .entry").evaluateAll("els => els.map(e => e.dataset.uuid)"))
+        assertTrue(page.getAttribute(".entry[data-uuid='a']", "class").orEmpty().contains("flash"))
+    }
+
+    @Test
+    fun snippetOfOtherFilesIsPlain() {
+        receive(request("x", "exception", """{"class":"Boom","message":"Failed","frames":[
+            {"file_name":"/app/view.twig","line_number":1,"snippet":[{"line_number":1,"text":"{% if new %}"}]}]}"""))
+        assertEquals(0, count(".snippet span[class^='syn-']"))
+    }
+
+    @Test
+    fun longLogContextFoldsButCopiesInFull() {
+        val trace = (0 until 30).joinToString("\\n") { "#$it /app/x.php($it)" }
+        receive(request("l", "application_log", """{"value":"Boom","level":"local.ERROR","context":"$trace"}"""))
+        assertTrue(page.locator(".fold-rest").isHidden())
+        assertEquals("Show 22 more lines", page.textContent(".fold-toggle"))
+
+        page.locator(".entry-copy").force()
+        val copied = posted().single().get("text").asString
+        assertTrue(copied, copied.contains("#29 /app/x.php(29)"))
+    }
+
+    @Test
+    fun entriesAreSeparated() {
+        receive(log("a"), request("a", "color", """{"color":"orange"}"""), log("b"), request("b", "color", """{"color":"orange"}"""))
+        val gap = js("() => { const [a, b] = document.querySelectorAll('.entry'); return b.getBoundingClientRect().top - a.getBoundingClientRect().bottom; }")
+        assertTrue("gap $gap", (gap as Number).toDouble() >= 4)
     }
 
     @Test
@@ -187,13 +291,13 @@ class WebviewTest {
     fun newScreenAddsTabWithReceiveTime() {
         val at = 1_790_000_000_000
         receive(log("a", at = at), request("s", "new_screen", """{"name":"Checkout"}""", at = at + 60_000), log("b"))
-        assertEquals(listOf("Screen 1" + localTime(at), "Checkout" + localTime(at + 60_000)), texts(".screen-tab"))
+        assertEquals(listOf("Screen 1" + localTime(at) + "×", "Checkout" + localTime(at + 60_000) + "×"), texts(".screen-tab"))
         assertTrue(page.locator("#screen-bar").isVisible())
         assertEquals(listOf("b"), page.locator(".screen:not([hidden]) .entry .text").allTextContents())
 
         page.locator(".screen-tab").first().click()
         assertEquals(listOf("a"), page.locator(".screen:not([hidden]) .entry .text").allTextContents())
-        assertEquals("1", page.textContent("#count"))
+        assertEquals("1 entry", page.textContent("#count"))
     }
 
     @Test
@@ -211,6 +315,84 @@ class WebviewTest {
         // Entries of dropped screens go with them
         assertEquals(10, count(".entry"))
         assertEquals(0, count(".entry[data-uuid='e0']"))
+    }
+
+    @Test
+    fun screenCanBeClosed() {
+        receive(log("a"), request("s1", "new_screen", """{"name":"Checkout"}"""), log("b"), request("s2", "new_screen", """{"name":"Payment"}"""), log("c"))
+        // Only the active screen shows its close button
+        page.locator(".screen-tab", Page.LocatorOptions().setHasText("Checkout")).click()
+        page.locator(".screen-tab.active .screen-close").click()
+
+        assertEquals(listOf("Screen 1", "Payment"), page.locator(".screen-tab").evaluateAll("els => els.map(e => e.firstChild.textContent)"))
+        assertEquals(0, count(".entry[data-uuid='b']"))
+        val message = posted().single()
+        assertEquals("removeRequests", message.get("action").asString)
+        assertEquals(listOf("b", "s1"), message.getAsJsonArray("uuids").map { it.asString })
+        assertEquals("\"Checkout\" closed", message.get("title").asString)
+    }
+
+    @Test
+    fun keyboardCommands() {
+        receive(log("a"), request("s1", "new_screen", """{"name":"Checkout"}"""), log("b"), log("c"))
+
+        js("() => window.dumpie.command('clearScreen')")
+        assertEquals(listOf("a"), page.locator(".entry").evaluateAll("els => els.map(e => e.dataset.uuid)"))
+        assertEquals(2, count(".screen-tab"))
+        assertEquals(listOf("b", "c"), posted().single().getAsJsonArray("uuids").map { it.asString })
+
+        js("() => window.dumpie.command('previousScreen')")
+        assertEquals(listOf("a"), page.locator(".screen:not([hidden]) .entry").evaluateAll("els => els.map(e => e.dataset.uuid)"))
+        js("() => window.dumpie.command('nextScreen')")
+        assertTrue(page.textContent(".screen-tab.active").orEmpty().startsWith("Checkout"))
+
+        js("() => window.dumpie.command('pause')")
+        assertTrue(page.locator("#paused-bar").isVisible())
+        js("() => window.dumpie.command('search')")
+        assertTrue(page.locator("#filter").isVisible())
+        js("() => window.dumpie.command('newScreen')")
+        assertEquals("newScreen", posted().last().get("action").asString)
+    }
+
+    @Test
+    fun toolbarTooltipsShowShortcuts() {
+        js("() => window.dumpie.options({pinBars: true, shortcuts: {clearAll: '⌘K', pause: '⌘P', search: '', newScreen: '⌘N'}})")
+        assertEquals("Clear all (⌘K)", page.getAttribute("#clear", "title"))
+        assertEquals("Pause feed (⌘P)", page.getAttribute("#pause", "title"))
+        assertEquals("Search", page.getAttribute("#search", "title"))
+        page.click("#pause")
+        assertEquals("Resume feed (⌘P)", page.getAttribute("#pause", "title"))
+    }
+
+    @Test
+    fun archiveListsClearedOutputAndRestores() {
+        page.click("#history")
+        assertEquals("archive", posted().single().get("action").asString)
+
+        js("() => window.dumpie.archive([{id: 7, session: 'shop', project: 'shop', time: Date.now(), title: 'Clear all', count: 12}])")
+        assertTrue(page.locator("#archive").isVisible())
+        assertTrue(page.textContent(".archive-item").orEmpty().contains("12 entries"))
+        page.click("[data-restore]")
+        val restore = posted().last()
+        assertEquals("restore", restore.get("action").asString)
+        assertEquals(7, restore.get("id").asInt)
+        assertEquals("shop", restore.get("session").asString)
+        assertTrue(page.locator("#archive").isHidden())
+    }
+
+    @Test
+    fun emptyArchiveSaysSoAndClosesOnOutsideClick() {
+        js("() => window.dumpie.archive([])")
+        assertTrue(page.textContent("#archive").orEmpty().contains("Nothing cleared yet"))
+        page.mouse().click(5.0, 300.0)
+        assertTrue(page.locator("#archive").isHidden())
+    }
+
+    @Test
+    fun lastScreenHasNoCloseButton() {
+        receive(request("s1", "new_screen", """{"name":"Checkout"}"""), log("a"))
+        assertEquals(1, count(".screen-tab"))
+        assertEquals(0, count(".screen-close"))
     }
 
     @Test
@@ -251,6 +433,19 @@ class WebviewTest {
         page.click(".dot[data-color='red']")
         page.click(".dot[data-color='green']")
         assertEquals(3, count(".entry:not(.hidden-by-filter)"))
+    }
+
+    @Test
+    fun filtersThatHideEverythingSaySoAndCanBeCleared() {
+        receive(log("a"), log("b"))
+        page.click(".dot[data-color='red']")
+        assertTrue(page.locator("#no-match").isVisible())
+        assertEquals("0 of 2 entries", page.textContent("#count"))
+
+        page.click("#clear-filters")
+        assertTrue(page.locator("#no-match").isHidden())
+        assertEquals("2 entries", page.textContent("#count"))
+        assertEquals(0, count(".dot.active"))
     }
 
     @Test
@@ -317,6 +512,17 @@ class WebviewTest {
         val message = posted().single()
         assertEquals("copy", message.get("action").asString)
         assertEquals("x.php:3\n```sql\nselect 1\n```", message.get("text").asString)
+    }
+
+    @Test
+    fun openInEditorSendsTheEntryText() {
+        receive(request("q", "executed_query", """{"sql":"select 1","connection_name":"mysql","time":1.5}"""))
+        page.locator(".entry-open").force()
+        val message = posted().single()
+        assertEquals("openText", message.get("action").asString)
+        assertEquals("select 1", message.get("text").asString)
+        assertEquals("sql", message.get("lang").asString)
+        assertEquals("Query", message.get("title").asString)
     }
 
     // Sessions
@@ -398,16 +604,34 @@ class WebviewTest {
     fun barsStayPinnedWhileScrolling() {
         sessions("""[{id: 'shop', name: 'shop', own: true, viewed: true}, {id: 'blog', name: 'blog'}]""", 2)
         receive(*Array(40) { log("e$it") })
-        fun top(selector: String) = (js("() => document.querySelector(\"$selector\").getBoundingClientRect().top") as Number).toDouble()
+        fun rect(selector: String, side: String) =
+            (js("() => document.querySelector(\"$selector\").getBoundingClientRect().$side") as Number).toDouble()
+        val barTop = rect("#session-bar", "top")
 
-        js("() => window.scrollTo(0, 2000)")
-        assertEquals(0.0, top(".toolbar"), 0.5)
-        assertEquals(top(".toolbar") + (js("() => document.querySelector('.toolbar').offsetHeight") as Number).toDouble(), top("#session-bar"), 0.5)
+        // Only the feed scrolls: its scrollbar starts below the bars, which stay where they are
+        js("() => { document.getElementById('feed').scrollTop = 2000; }")
+        assertTrue((js("() => document.getElementById('feed').scrollTop") as Number).toDouble() > 0)
+        assertEquals(0.0, rect(".toolbar", "top"), 0.5)
+        assertEquals(barTop, rect("#session-bar", "top"), 0.5)
+        assertTrue(rect("#feed", "top") >= rect("#screen-bar, #session-bar", "bottom"))
+        assertEquals(0.0, (js("() => window.scrollY") as Number).toDouble(), 0.5)
 
         js("() => window.dumpie.options({pinBars: false})")
-        js("() => window.scrollTo(0, 2000)")
-        assertEquals(0.0, top(".toolbar"), 0.5)
-        assertTrue(top("#session-bar") < 0)
+        js("() => { document.getElementById('feed').scrollTop = 2000; }")
+        assertEquals(0.0, rect(".toolbar", "top"), 0.5)
+        assertTrue(rect("#session-bar", "bottom") < rect(".toolbar", "bottom"))
+    }
+
+    @Test
+    fun timesFollowTheIdeFormat() {
+        val at = js("() => new Date(2026, 9, 23, 18, 46, 28).getTime()") as Number
+        js("() => window.dumpie.options({pinBars: true, locale: 'en-US', hour12: false})")
+        receive(log("a", at = at.toLong()))
+        assertEquals("18:46:28", page.textContent(".entry-meta span"))
+
+        js("() => window.dumpie.options({pinBars: true, locale: 'en-US', hour12: true})")
+        receive(log("b", at = at.toLong()))
+        assertEquals("6:46:28 PM", page.textContent(".entry[data-uuid='b'] .entry-meta span"))
     }
 
     @Test

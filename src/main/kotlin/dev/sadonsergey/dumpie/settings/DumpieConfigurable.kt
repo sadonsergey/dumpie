@@ -3,6 +3,7 @@ package dev.sadonsergey.dumpie.settings
 import com.intellij.openapi.components.service
 import com.intellij.openapi.options.BoundConfigurable
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.project.ProjectManager
 import com.intellij.openapi.ui.DialogPanel
 import com.intellij.ui.dsl.builder.Align
 import com.intellij.ui.dsl.builder.bindIntText
@@ -11,7 +12,9 @@ import com.intellij.ui.dsl.builder.bindText
 import com.intellij.ui.dsl.builder.columns
 import com.intellij.ui.dsl.builder.panel
 import com.intellij.ui.dsl.builder.rows
+import com.intellij.ui.dsl.builder.selected
 import dev.sadonsergey.dumpie.LogWatcher
+import dev.sadonsergey.dumpie.OutputMarkers
 import dev.sadonsergey.dumpie.RayServer
 import dev.sadonsergey.dumpie.dump.DumpServer
 import dev.sadonsergey.dumpie.ui.DumpiePanel
@@ -32,11 +35,35 @@ class DumpieConfigurable(private val project: Project) : BoundConfigurable("Dump
                 checkBox("dump() / dd() via VarDumper server, port").bindSelected(app::dumpEnabled)
                 intTextField(1..65535).bindIntText(app::dumpPort).columns(6)
             }
+        }
+
+        group("Display") {
             row {
                 checkBox("Show the tool window when output arrives").bindSelected(app::showToolWindowOnMessage)
             }
             row {
                 checkBox("Keep the project and screen bars visible while scrolling").bindSelected(app::pinBars)
+            }
+            row {
+                checkBox("Use the editor background (white) in light themes instead of the tool window background")
+                    .bindSelected(app::whiteBackgroundInLightThemes)
+            }
+            row {
+                checkBox("Show an icon in the editor gutter on lines that produced output").bindSelected(app::showGutterIcons)
+            }
+        }
+
+        group("SQL queries") {
+            row {
+                checkBox("Show the number of queries and their total time in the toolbar").bindSelected(app::showQueryStats)
+            }
+            row {
+                checkBox("Mark repeated queries (possible N+1)").bindSelected(app::markRepeatedQueries)
+            }.rowComment("The same statement with other values ran 3 or more times on one screen")
+            row {
+                val slow = checkBox("Mark queries slower than").bindSelected(app::markSlowQueries)
+                intTextField(1..600_000).bindIntText(app::slowQueryMs).columns(6).enabledIf(slow.selected)
+                label("ms")
             }
         }
 
@@ -86,6 +113,8 @@ class DumpieConfigurable(private val project: Project) : BoundConfigurable("Dump
         service<RayServer>().restart()
         service<DumpServer>().restart()
         project.service<LogWatcher>().restart()
+        // Turning the gutter icons off removes the ones already shown
+        if (!app.showGutterIcons) ProjectManager.getInstance().openProjects.forEach { it.service<OutputMarkers>().clear() }
         DumpiePanel.settingsChanged()
     }
 

@@ -3,37 +3,47 @@
     <name>Dumpie</name>
     <vendor>Sergey Sadon</vendor>
     <description><![CDATA[
-        <p>PHP debug output right inside the IDE. <code>dump()</code>, <code>dd()</code>, log records, SQL queries,
-        exceptions and <code>ray()</code> calls appear in a tool window next to your code, with a link to the line
-        that produced them.</p>
+        <p><b>See <code>dump()</code>, <code>dd()</code>, log records and <code>ray()</code> output in a tool window
+        instead of the browser or <code>laravel.log</code>.</b> Every entry links to the line that produced it.</p>
 
-        <h3>What it catches</h3>
+        <h3>Get started in a minute</h3>
+        <ol>
+            <li>Install the plugin and open your project.</li>
+            <li>Add one line to <code>.env</code>, or press <b>Add to .env</b> in the Dumpie tool window:
+                <code>VAR_DUMPER_FORMAT=server</code></li>
+            <li>Call <code>dump($order)</code>. It shows up in the tool window.</li>
+        </ol>
+        <p>Projects with <code>spatie/ray</code> or <code>spatie/laravel-ray</code> need no setup at all. Just quit the
+        Ray desktop app: both listen on port 23517. In Docker or Sail, also set
+        <code>VAR_DUMPER_SERVER=host.docker.internal:9912</code>.</p>
+
+        <h3>What you get</h3>
         <ul>
-            <li><b>dump() and dd()</b> from any project with <code>symfony/var-dumper</code> (Laravel, Symfony, …):
-                add <code>VAR_DUMPER_FORMAT=server</code> to <code>.env</code>, or press <i>Add to .env</i> in the settings.</li>
-            <li><b>Log files</b>: new records from <code>storage/logs</code> or <code>var/log</code>, colored by level,
-                with the stack trace.</li>
-            <li><b>spatie/ray and spatie/laravel-ray</b> work without any changes: tables, queries, events, jobs, mails,
-                models, exceptions, measurements, <code>pause()</code>, colors, labels and screens.</li>
+            <li><b>dump() and dd()</b>: expandable dumps colored with your editor scheme. Works in any project with
+                <code>symfony/var-dumper</code>, which comes with Laravel and Symfony.</li>
+            <li><b>Log files</b>: new records from <code>storage/logs</code> or <code>var/log</code> as they are
+                written, colored by level, with the stack trace.</li>
+            <li><b>ray()</b>: tables, queries, events, jobs, mails, models, exceptions, <code>measure()</code>,
+                <code>pause()</code>, colors and screens.</li>
+            <li><b>Exceptions</b> with the code around the failing line; vendor frames are folded.</li>
+            <li><b>Jump to code</b>: click <code>File.php:42</code>. Docker and Sail paths are mapped to your project.</li>
         </ul>
 
-        <h3>Built for reading</h3>
+        <h3>Many projects, many IDEs</h3>
         <ul>
-            <li>Interactive dumps colored with your editor scheme; light and dark themes follow the IDE.</li>
-            <li>Exceptions with the code around the failing line and folded vendor frames.</li>
-            <li>Filter by color, search, pause the feed, collapse entries.</li>
-            <li>Copy any entry as a Markdown code block that keeps highlighting in chats and issues.</li>
-            <li>One session per project, a switcher between projects and an <i>All projects</i> feed.</li>
-            <li>Several IDEs at once: with PhpStorm and WebStorm open together, output reaches the IDE that has the
-                project open.</li>
-            <li>When a project cannot send anything yet, the empty tool window shows what is missing, with an
-                <i>Add to .env</i> button.</li>
-            <li>Docker and Sail paths are matched to project files automatically.</li>
+            <li>One session per project, so output never mixes. Unread counters show where something new arrived.</li>
+            <li>Open any project's session from any window, or see <b>All projects</b> in one feed.</li>
+            <li>PhpStorm and WebStorm open together? Output reaches the window that has the project open.</li>
         </ul>
 
-        <p>The project is inspected on first open: Dumpie reads <code>composer.lock</code>, <code>.env</code> and the log
-        directories and enables what fits. Everything is adjustable in <i>Settings | Tools | Dumpie</i>.
-        Dumpie listens on 127.0.0.1 only; nothing leaves your machine.</p>
+        <h3>Made for reading</h3>
+        <ul>
+            <li>Filter by color or text, pause the feed, collapse entries.</li>
+            <li>Copy any entry as a Markdown code block for chats and issues.</li>
+            <li>Light and dark themes and fonts follow the IDE.</li>
+        </ul>
+
+        <p>Dumpie listens on <code>127.0.0.1</code> only, so nothing leaves your machine. Free and open source (MIT).</p>
 
         <p><small>Dumpie is an independent project, not affiliated with or endorsed by Spatie.
         Ray and spatie/ray are products of Spatie.</small></p>

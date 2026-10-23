@@ -6,16 +6,16 @@
 each with a link to the line that produced it. No separate app, no extra browser tab, no scrolling through
 `laravel.log`.
 
-![Dumpie next to the code in PhpStorm](docs/marketplace/1-hero.png)
+![Dumpie next to the code in PhpStorm](docs/marketplace/01-hero.png)
 
 ## Many projects. Many IDEs. Nothing mixes up.
 
 Real work means several projects open at once — often in different IDEs. Dumpie keeps every project's output in
 its own session and delivers it to the window that has the project open.
 
-![Viewing another project's session and all projects at once](docs/marketplace/2-sessions.png)
+![Viewing another project's session and all projects at once](docs/marketplace/02-sessions.png)
 
-![Output of each project reaches its own IDE window](docs/marketplace/3-ides.png)
+![Output of each project reaches its own IDE window](docs/marketplace/03-ides.png)
 
 - **A session per project.** `shop` never sees `blog`'s dumps, even when both run at the same time.
 - **Switch or see everything.** The project chips under the toolbar open any open project's session from any
@@ -52,12 +52,15 @@ its own session and delivers it to the window that has the project open.
 - **Works with `spatie/ray`.** Projects that already use `spatie/ray` or `spatie/laravel-ray` work as they are:
   tables, queries, events, jobs, mails, models, exceptions, measurements, `pause()`, colors, labels and screens.
 - **Jump to code.** Every entry links to its file and line. Docker paths such as `/var/www/html/app/...` are matched
-  to your project automatically.
+  to your project automatically. And back: an icon in the editor gutter marks the lines that sent output.
+- **SQL insights.** Repeated queries (possible N+1) and slow queries are marked; the toolbar shows how many queries a
+  screen ran and their total time.
 - **One session per project, several IDEs at once.** See [above](#many-projects-many-ides-nothing-mixes-up).
 - **Guided setup.** When a project cannot send anything yet, the empty tool window shows what is missing, with an
   **Add to .env** button and ready-to-copy commands.
-- **Made for reading.** Filter by color, search, pause the feed, collapse entries, copy any entry as a Markdown code
-  block that keeps syntax highlighting in chats and issues.
+- **Made for reading.** Highlighted code, SQL and JSON, folded stack traces. Filter by color, search, pause the feed,
+  collapse entries, copy any entry as a Markdown code block or open it in an editor tab.
+- **Nothing lost.** Whatever Clear removes goes to an archive and can be restored to its project.
 - **Follows the IDE.** Light and dark themes, UI and editor fonts come from your IDE settings.
 - **Local only.** Dumpie listens on `127.0.0.1`; nothing leaves your machine.
 
@@ -77,7 +80,7 @@ Open the **Dumpie** tool window: if the project cannot send anything yet (no `sp
 in `.env`), it shows what is missing and offers the fix right there. The same information is in
 **Settings | Tools | Dumpie**.
 
-![Setup hints in the empty tool window](docs/marketplace/5-setup.png)
+![Setup hints in the empty tool window](docs/marketplace/09-setup.png)
 
 ### dump() and dd()
 
@@ -137,11 +140,11 @@ File links work without extra setup: a container path is matched to the project 
 
 ## Using the tool window
 
-![Exception with code snippet, and the feed filtered to errors and warnings](docs/marketplace/4-errors.png)
+![Exception with code snippet, and the feed filtered to errors and warnings](docs/marketplace/04-errors.png)
 
 The panel follows the IDE theme and fonts:
 
-![Light theme](docs/marketplace/6-light.png)
+![Light theme](docs/marketplace/10-light.png)
 
 - **Open the source**: click `File.php:42` under an entry.
 - **Filter**: click color dots (several at once), or the search icon to filter by text; `Esc` clears the search.
@@ -150,18 +153,49 @@ The panel follows the IDE theme and fonts:
 - **Collapse**: click the colored left edge of an entry.
 - **Copy**: hover an entry and press the copy icon. The entry goes to the clipboard as a Markdown block
   (```` ```php ````, ```` ```sql ````, ```` ```json ````) together with its `file:line`.
-- **Screens**: `ray()->newScreen('Checkout')` starts a fresh screen; earlier screens stay in the screen selector.
-- **Sessions**: with several projects open, the session bar under the toolbar switches between their sessions or
-  shows **All projects**. Every project keeps its color; a new tool window always starts with its own project.
-- **Clear**: the broom icon clears the session you are looking at.
+- **Open in editor**: the icon next to Copy opens the entry in an editor tab, handy for big dumps and JSON.
+- **Screens**: `ray()->newScreen('Checkout')` starts a fresh screen; earlier screens stay in the screen selector. The
+  `×` on the active tab closes a screen.
+- **Sessions**: with several projects open, the project bar under the toolbar switches between their sessions or
+  shows **All**. Every project keeps its color; a new tool window always starts with its own project.
+- **Clear**: the broom icon clears the session you are looking at. The clock icon lists what was cleared;
+  **Restore** puts it back into the project it came from.
+- **Gutter icons**: lines that produced output get a Dumpie icon in the editor gutter. Hover it to see what the line
+  sent, click it to jump to the entry.
+- **SQL**: queries that ran 3 or more times with different values are marked **Repeated** (possible N+1), queries over
+  the threshold (100 ms by default) are marked **Slow**.
+
+![Gutter icons: hover shows what a line sent, a click jumps to the entry](docs/marketplace/06-gutter.png)
+
+![SQL insights: repeated and slow queries](docs/marketplace/05-sql.png)
+
+![An entry opened in an editor tab](docs/marketplace/08-open.png)
+
+### Keyboard shortcuts
+
+![Shortcuts and the archive of cleared output](docs/marketplace/07-keys.png)
+
+They work while the Dumpie tool window has focus, so ⌘K still commits in the editor. All of them are in
+**Tools | Dumpie** and can be remapped in **Settings | Keymap**.
+
+| Action | macOS | Windows / Linux |
+|---|---|---|
+| Clear all | ⌘K | Ctrl+K |
+| Clear the current screen | ⌘L | Ctrl+L |
+| New screen | ⌘N | Ctrl+N |
+| Pause / resume | ⌘P | Ctrl+P |
+| Search | ⌘F | Ctrl+F |
+| Next / previous screen | ⌘] / ⌘[ | Ctrl+] / Ctrl+[ |
 
 ## Settings
 
 **Settings | Tools | Dumpie**
 
 - **Receivers (all projects)**: turn the `spatie/ray` receiver (port `23517`) and the `dump()` receiver (port `9912`)
-  on or off, change their ports, choose whether the tool window opens when output arrives and whether the project
-  and screen bars stay pinned under the toolbar while scrolling (on by default).
+  on or off and change their ports.
+- **Display**: open the tool window when output arrives, keep the bars pinned while scrolling, use a white
+  background in light themes, show gutter icons.
+- **SQL queries**: query totals in the toolbar, **Repeated** marks, **Slow** marks and their threshold.
 - **This project**: which sources feed this project (`ray()`, `dump()`, log files), the log file patterns, and what was
   detected in `composer.lock` and `.env`. **Detect Again** re-reads the project.
 

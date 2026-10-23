@@ -6,6 +6,8 @@
 each with a link to the line that produced it. No separate app, no extra browser tab, no scrolling through
 `laravel.log`.
 
+**Website:** [sadonsergey.github.io/dumpie](https://sadonsergey.github.io/dumpie/)
+
 ![Dumpie next to the code in PhpStorm](docs/marketplace/01-hero.png)
 
 ## Many projects. Many IDEs. Nothing mixes up.

@@ -6,21 +6,20 @@
 each with a link to the line that produced it. No separate app, no extra browser tab, no scrolling through
 `laravel.log`.
 
-![Dumpie tool window](docs/screenshots/feed-dark.png)
+![Dumpie next to the code in PhpStorm](docs/marketplace/1-hero.png)
 
 ## Many projects. Many IDEs. Nothing mixes up.
 
 Real work means several projects open at once — often in different IDEs. Dumpie keeps every project's output in
 its own session and delivers it to the window that has the project open.
 
-![Output of each project reaches its own IDE window](docs/screenshots/multi-ide.png)
+![Viewing another project's session and all projects at once](docs/marketplace/2-sessions.png)
 
-| | |
-|---|---|
-| ![Viewing the blog session from the shop window](docs/screenshots/session-switch-dark.png) | ![All projects in one feed](docs/screenshots/all-projects-dark.png) |
-| **Switch sessions.** The session bar under the toolbar opens any open project's session from any window — here the `shop` window shows what `blog` sent. | **All projects.** One feed for everything, each entry tagged with its project's color. |
+![Output of each project reaches its own IDE window](docs/marketplace/3-ides.png)
 
 - **A session per project.** `shop` never sees `blog`'s dumps, even when both run at the same time.
+- **Switch or see everything.** The project chips under the toolbar open any open project's session from any
+  window, or **All projects**: one feed with every entry tagged by its project.
 - **Unread counters.** Each project chip shows how many new entries arrived while you were looking at another
   session.
 - **Across IDEs.** PhpStorm and WebStorm (or two IDE versions) open side by side? The IDE that receives the output
@@ -77,7 +76,7 @@ Open the **Dumpie** tool window: if the project cannot send anything yet (no `sp
 in `.env`), it shows what is missing and offers the fix right there. The same information is in
 **Settings | Tools | Dumpie**.
 
-<img src="docs/screenshots/setup-guide-dark.png" width="420" alt="Setup hints in the empty tool window">
+![Setup hints in the empty tool window](docs/marketplace/5-setup.png)
 
 ### dump() and dd()
 
@@ -137,14 +136,11 @@ File links work without extra setup: a container path is matched to the project 
 
 ## Using the tool window
 
-| | |
-|---|---|
-| ![Exception with code snippet](docs/screenshots/exception-dark.png) | ![Only errors and warnings](docs/screenshots/filter-dark.png) |
-| Exceptions show the code around the failing line; vendor frames are folded. | Color dots in the toolbar filter the feed, e.g. errors and warnings only. |
+![Exception with code snippet, and the feed filtered to errors and warnings](docs/marketplace/4-errors.png)
 
 The panel follows the IDE theme and fonts:
 
-<img src="docs/screenshots/feed-light.png" width="420" alt="Light theme">
+![Light theme](docs/marketplace/6-light.png)
 
 - **Open the source**: click `File.php:42` under an entry.
 - **Filter**: click color dots (several at once), or the search icon to filter by text; `Esc` clears the search.

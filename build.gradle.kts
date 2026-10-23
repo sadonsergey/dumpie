@@ -1,5 +1,6 @@
 import org.jetbrains.intellij.platform.gradle.IntelliJPlatformType
 import org.jetbrains.intellij.platform.gradle.TestFrameworkType
+import org.jetbrains.intellij.platform.gradle.tasks.VerifyPluginTask
 import org.jetbrains.kotlin.gradle.dsl.JvmDefaultMode
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.dsl.KotlinVersion
@@ -68,6 +69,15 @@ intellijPlatform {
     // IDEs checked by `./gradlew verifyPlugin`, e.g. -PverifyIdes=PhpStorm:2024.3,WebStorm:2025.1
     // (CI runs one IDE per job to stay within the runner's disk space)
     pluginVerification {
+        // The Marketplace shows deprecated and internal API usages as warnings on the plugin page: fail on them here
+        failureLevel = listOf(
+            VerifyPluginTask.FailureLevel.COMPATIBILITY_PROBLEMS,
+            VerifyPluginTask.FailureLevel.INVALID_PLUGIN,
+            VerifyPluginTask.FailureLevel.MISSING_DEPENDENCIES,
+            VerifyPluginTask.FailureLevel.DEPRECATED_API_USAGES,
+            VerifyPluginTask.FailureLevel.SCHEDULED_FOR_REMOVAL_API_USAGES,
+            VerifyPluginTask.FailureLevel.INTERNAL_API_USAGES,
+        )
         ides {
             providers.gradleProperty("verifyIdes").orElse("PhpStorm:2026.2").get()
                 .split(',').map { it.trim() }.filter { it.isNotEmpty() }

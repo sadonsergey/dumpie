@@ -48,12 +48,15 @@ jobs:
           - PhpStorm:2025.3
           - PhpStorm:2026.1
           - PhpStorm:2026.2
+          # 2026.3 EAP by build number; update to the release when it is out
+          - PhpStorm:263.7307.51
           - WebStorm:2024.3
           - WebStorm:2025.1
           - WebStorm:2025.2
           - WebStorm:2025.3
           - WebStorm:2026.1
           - WebStorm:2026.2
+          - WebStorm:263.7307.49
     steps:
       - uses: actions/checkout@v4
 

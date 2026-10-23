@@ -54,6 +54,11 @@
     ]]></description>
 
     <change-notes><![CDATA[
+        <p><b>0.2.1</b></p>
+        <ul>
+            <li>Open in editor no longer uses an API deprecated in 2026.3.</li>
+        </ul>
+
         <p><b>0.2.0</b></p>
         <ul>
             <li>Gutter icons on the lines that produced output: hover shows what they sent, a click reveals the entry.</li>

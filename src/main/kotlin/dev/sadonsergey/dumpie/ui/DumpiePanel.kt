@@ -15,7 +15,7 @@ import com.intellij.openapi.components.service
 import com.intellij.openapi.editor.DefaultLanguageHighlighterColors
 import com.intellij.openapi.editor.colors.EditorColorsListener
 import com.intellij.openapi.editor.colors.EditorColorsManager
-import com.intellij.openapi.fileEditor.FileEditorManager
+import com.intellij.openapi.fileEditor.OpenFileDescriptor
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.ProjectManager
 import com.intellij.openapi.project.ProjectManagerListener
@@ -371,7 +371,7 @@ class DumpiePanel(private val project: Project, parent: Disposable) {
         val extension = lang.takeIf { it.matches(EXTENSION) && it != "php" } ?: "txt"
         val name = title.replace(UNSAFE_NAME, " ").trim().take(60).ifEmpty { "entry" }
         val file = LightVirtualFile("Dumpie $name.$extension", text)
-        ApplicationManager.getApplication().invokeLater({ FileEditorManager.getInstance(project).openFile(file, true) }, project.disposed)
+        ApplicationManager.getApplication().invokeLater({ OpenFileDescriptor(project, file).navigate(true) }, project.disposed)
     }
 
     private fun onMessage(message: String) {

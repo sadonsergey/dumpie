@@ -10,13 +10,21 @@ import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
+import com.intellij.openapi.util.ScalableIcon
 import com.intellij.openapi.wm.ToolWindow
 import com.intellij.openapi.wm.ToolWindowManager
 import com.intellij.openapi.wm.ex.ToolWindowManagerListener
-import com.intellij.ui.BadgeIconSupplier
+import com.intellij.ui.JBColor
+import com.intellij.util.ui.UIUtil
 import dev.sadonsergey.dumpie.settings.DumpieSettings
 import dev.sadonsergey.dumpie.ui.DumpiePanel
 import java.util.concurrent.CopyOnWriteArrayList
+import java.awt.BasicStroke
+import java.awt.Component
+import java.awt.Graphics
+import java.awt.Graphics2D
+import java.awt.RenderingHints
+import java.awt.geom.Ellipse2D
 import javax.swing.Icon
 
 /**
@@ -167,11 +175,43 @@ class DumpieProjectService(private val project: Project) : Disposable {
         }
         val icon = plainIcon ?: toolWindow.icon?.also { plainIcon = it } ?: return
         val title = plainTitle ?: toolWindow.stripeTitle.also { plainTitle = it }
-        toolWindow.setIcon(BadgeIconSupplier(icon).errorIcon)
+        toolWindow.setIcon(ErrorMarkIcon(icon))
         toolWindow.stripeTitle = "$title: " + if (unseenErrors == 1) "1 new error" else "$unseenErrors new errors"
     }
 
     override fun dispose() = Unit
+
+    /**
+     * The tool window icon with a red dot in its top right corner (BadgeIconSupplier is internal API in 2024.3).
+     * Scalable, because the stripe of the new UI scales tool window icons.
+     */
+    private class ErrorMarkIcon(private val icon: Icon) : ScalableIcon {
+        override fun getScale() = (icon as? ScalableIcon)?.scale ?: 1f
+
+        override fun scale(scaleFactor: Float): Icon = ErrorMarkIcon((icon as? ScalableIcon)?.scale(scaleFactor) ?: icon)
+
+        override fun getIconWidth() = icon.iconWidth
+
+        override fun getIconHeight() = icon.iconHeight
+
+        override fun paintIcon(c: Component?, g: Graphics, x: Int, y: Int) {
+            icon.paintIcon(c, g, x, y)
+            val g2 = g.create() as Graphics2D
+            try {
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
+                val size = iconWidth * 0.42
+                val dot = Ellipse2D.Double(x + iconWidth - size, y.toDouble(), size, size)
+                // A ring in the stripe color keeps the dot apart from the icon under it
+                g2.color = UIUtil.getPanelBackground()
+                g2.stroke = BasicStroke((size / 4).toFloat())
+                g2.draw(dot)
+                g2.color = MARK_COLOR
+                g2.fill(dot)
+            } finally {
+                g2.dispose()
+            }
+        }
+    }
 
     class Entry internal constructor(internal val seq: Long, internal val json: String, internal val uuid: String?, internal val types: Set<String>)
 
@@ -186,7 +226,8 @@ class DumpieProjectService(private val project: Project) : Disposable {
         private const val MAX_HISTORY = 1000
         private const val MAX_ARCHIVE = 10
         internal const val RECEIVED_AT = "dumpie_received_at"
-        private val ERROR_LEVEL = Regex("""(?i)(^|\.)(error|critical|alert|emergency)$""")
+        private val MARK_COLOR = JBColor(0xE5484D, 0xDB5C5C)
+        private val ERROR_LEVEL =Regex("""(?i)(^|\.)(error|critical|alert|emergency)$""")
 
         /** Meta flag: the output came from dd() / rd(), the script ended there. */
         internal const val STOPPED = "dumpie_stopped"

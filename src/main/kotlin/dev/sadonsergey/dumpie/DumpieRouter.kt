@@ -10,6 +10,8 @@ import com.intellij.openapi.project.ProjectManager
 import com.intellij.openapi.wm.IdeFocusManager
 import dev.sadonsergey.dumpie.settings.DumpieProjectSettings
 import java.io.File
+import java.io.IOException
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Delivers a request received by one of the receivers to the session of the project it belongs to,
@@ -19,6 +21,7 @@ object DumpieRouter {
     const val NOTIFICATION_GROUP = "Dumpie"
     const val SOURCE_RAY = "ray"
     const val SOURCE_DUMP = "dump"
+    private const val MAX_STOP_LINES = 500
 
     /** A project that may receive the request: open here ([local]) or in another IDE ([instance]). */
     internal class Target(val name: String, val path: String, val local: Project? = null, val instance: DumpieRelay.Instance? = null)
@@ -55,7 +58,40 @@ object DumpieRouter {
             SOURCE_DUMP -> settings.dumpEnabled
             else -> true
         }
-        if (accepted) project.service<DumpieProjectService>().receive(request)
+        if (!accepted) return
+        markStop(project, request, source)
+        project.service<DumpieProjectService>().receive(request)
+    }
+
+    // dd() and ray's rd() / ->die() end the script right after the output. The request does not say so,
+    // the source line does; it is read once per file version
+    private val STOP_CALLS = mapOf(
+        SOURCE_DUMP to Regex("""\bddd?\s*\("""),
+        SOURCE_RAY to Regex("""\brd\s*\(|->\s*die\s*\("""),
+    )
+    private val stopLines = ConcurrentHashMap<String, Pair<Long, Boolean>>()
+
+    private fun markStop(project: Project, request: JsonObject, source: String) {
+        val pattern = STOP_CALLS[source] ?: return
+        val origin = (request.get("payloads") as? JsonArray)
+            ?.firstNotNullOfOrNull { (it as? JsonObject)?.get("origin") as? JsonObject } ?: return
+        val path = origin.str("file")?.takeIf { it.endsWith(".php") } ?: return
+        val line = origin.get("line_number")?.takeIf { it.isJsonPrimitive }?.asInt ?: return
+        val file = FileResolver.localFile(project, path) ?: return
+        val modified = file.lastModified()
+        val key = "${file.path}:$line"
+        val stops = stopLines[key]?.takeIf { it.first == modified }?.second ?: try {
+            val code = file.useLines { lines -> lines.drop(line - 1).firstOrNull() }.orEmpty()
+            pattern.containsMatchIn(code).also {
+                if (stopLines.size > MAX_STOP_LINES) stopLines.clear()
+                stopLines[key] = modified to it
+            }
+        } catch (e: IOException) {
+            false
+        }
+        if (!stops) return
+        val meta = request.get("meta") as? JsonObject ?: JsonObject().also { request.add("meta", it) }
+        meta.addProperty(DumpieProjectService.STOPPED, true)
     }
 
     private fun localTargets() = ProjectManager.getInstance().openProjects

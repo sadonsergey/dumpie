@@ -51,6 +51,12 @@ class DumpieConfigurable(private val project: Project) : BoundConfigurable("Dump
             row {
                 checkBox("Show an icon in the editor gutter on lines that produced output").bindSelected(app::showGutterIcons)
             }
+            row {
+                checkBox("Mark the tool window icon when errors arrive while it is hidden").bindSelected(app::errorBadge)
+            }.rowComment("Exceptions and error log records; showing the tool window clears the mark and scrolls to the last error")
+            row {
+                checkBox("Treat entries without a color as gray in the color filter").bindSelected(app::grayUncolored)
+            }.rowComment("dump() output, info log records and ray() calls without a color")
         }
 
         group("SQL queries") {

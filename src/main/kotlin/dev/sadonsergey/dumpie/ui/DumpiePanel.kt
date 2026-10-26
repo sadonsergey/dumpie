@@ -174,6 +174,7 @@ class DumpiePanel(private val project: Project, parent: Disposable) {
         }
         execute("window.dumpie && window.dumpie.options({pinBars: ${settings.pinBars}, locale: '$locale', hour12: $hour12, " +
             "queryStats: ${settings.showQueryStats}, repeatedQueries: ${settings.markRepeatedQueries}, " +
+            "grayUncolored: ${settings.grayUncolored}, " +
             "slowQueryMs: ${if (settings.markSlowQueries) settings.slowQueryMs else 0}, shortcuts: $shortcuts});")
     }
 
@@ -326,10 +327,11 @@ class DumpiePanel(private val project: Project, parent: Disposable) {
         fun command(project: Project, name: String) =
             panels.firstOrNull { it.project == project }?.execute("window.dumpie && window.dumpie.command(${JsonPrimitive(name)});")
 
-        // Toolbar tooltips show the current shortcuts, remapped ones included
+        // Toolbar tooltips and the empty screen show the current shortcuts, remapped ones included
         private val SHORTCUT_ACTIONS = mapOf(
             "clearAll" to "Dumpie.ClearAll", "clearScreen" to "Dumpie.ClearScreen", "newScreen" to "Dumpie.NewScreen",
             "pause" to "Dumpie.Pause", "search" to "Dumpie.Search",
+            "nextScreen" to "Dumpie.NextScreen", "previousScreen" to "Dumpie.PreviousScreen",
         )
 
         /** The page with app.css and app.js inlined. */

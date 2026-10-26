@@ -28,7 +28,9 @@
     const OPEN_ICON = '<svg viewBox="0 0 16 16"><path d="M3.5 2h4v1.5h-4v9h9v-4H14v4a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 2 12.5v-9A1.5 1.5 0 0 1 3.5 2zm6-.5H14.5V6.5H13V4.06L7.53 9.53 6.47 8.47 11.94 3H9.5V1.5z"/></svg>';
     const PROJECTS_ICON = '<svg viewBox="0 0 16 16"><path d="M2.5 2.5h4l1.5 1.5h5.5A1.5 1.5 0 0 1 15 5.5v7a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 1 12.5v-8.5A1.5 1.5 0 0 1 2.5 2.5zm0 1.5v8.5h11v-7H7.38L5.88 4H2.5z"/></svg>';
     const SCREENS_ICON = '<svg viewBox="0 0 16 16"><path d="M5 1.5h8A1.5 1.5 0 0 1 14.5 3v7a1.5 1.5 0 0 1-1.5 1.5h-1.5V10H13V3H5v1.5H3.5V3A1.5 1.5 0 0 1 5 1.5zM3 5.5h8A1.5 1.5 0 0 1 12.5 7v6A1.5 1.5 0 0 1 11 14.5H3A1.5 1.5 0 0 1 1.5 13V7A1.5 1.5 0 0 1 3 5.5zM3 7v6h8V7H3z"/></svg>';
-    const CHECK_ICON = '<svg viewBox="0 0 16 16"><path d="M13.3 3.8l1.1 1.1-7.6 7.6-4.2-4.2 1.1-1.1 3.1 3.1z"/></svg>';
+    const MARKDOWN_ICON = '<svg viewBox="0 0 16 16"><path fill-rule="evenodd" d="M2 3h12a1.5 1.5 0 0 1 1.5 1.5v7A1.5 1.5 0 0 1 14 13H2a1.5 1.5 0 0 1-1.5-1.5v-7A1.5 1.5 0 0 1 2 3zm0 1.4v7.2h12V4.4H2zm1.3 6V5.6h1.4l1.3 1.7 1.3-1.7h1.4v4.8H7.3V7.7L6 9.4 4.7 7.7v2.7H3.3zm8.2-4.8h1.4v2.6h1.3L12.2 11 10.2 8.2h1.3V5.6z"/></svg>';
+    const STOP_ICON ='<svg viewBox="0 0 16 16"><rect x="3.5" y="3.5" width="9" height="9" rx="1.5"/></svg>';
+    const CHECK_ICON ='<svg viewBox="0 0 16 16"><path d="M13.3 3.8l1.1 1.1-7.6 7.6-4.2-4.2 1.1-1.1 3.1 3.1z"/></svg>';
 
     // JCEF renders off-screen and may leave stale pixels where content shrank (e.g. the setup guide going from
     // "setup" to "ready"); touching the root forces a full repaint
@@ -64,6 +66,219 @@
             s.textContent = old.textContent;
             old.replaceWith(s);
         });
+    }
+
+    // A VarDumper dump (HtmlDumper or DumpRenderer markup) back to PHP code: short arrays, objects as arrays of
+    // their properties under a class comment, cut parts as comments
+    function dumpToPhp(pre) {
+        const tokens = [];
+        (function walk(node) {
+            node.childNodes.forEach(function (n) {
+                if (n.nodeType === Node.TEXT_NODE) return tokens.push({ t: 'text', v: n.nodeValue });
+                if (n.nodeType !== Node.ELEMENT_NODE) return;
+                const c = n.classList;
+                if (n.tagName === 'SCRIPT' || n.tagName === 'STYLE' || c.contains('sf-dump-toggle') || c.contains('code-copy') || c.contains('sf-dump-label')) return;
+                if (n.tagName === 'SAMP') {
+                    tokens.push({ t: 'open' });
+                    walk(n);
+                    return tokens.push({ t: 'close' });
+                }
+                if (c.contains('sf-dump-note')) return tokens.push({ t: 'note', v: n.textContent, title: n.getAttribute('title') || '' });
+                if (c.contains('sf-dump-key')) return tokens.push({ t: 'key', v: n.textContent });
+                if (c.contains('sf-dump-index')) return tokens.push({ t: 'index', v: Number(n.textContent) });
+                if (c.contains('sf-dump-public') || c.contains('sf-dump-protected') || c.contains('sf-dump-private') || c.contains('sf-dump-meta')) {
+                    return tokens.push({ t: 'prop', v: n.textContent });
+                }
+                if (c.contains('sf-dump-str')) return tokens.push({ t: 'str', v: dumpString(n) });
+                if (c.contains('sf-dump-num')) return tokens.push({ t: 'num', v: n.textContent });
+                if (c.contains('sf-dump-const')) return tokens.push({ t: 'const', v: n.textContent });
+                if (c.contains('sf-dump-ellipsis')) return tokens.push({ t: 'cut' });
+                if (c.contains('sf-dump-ref')) return;
+                walk(n);
+            });
+        })(pre);
+
+        let i = 0;
+        function skipText() {
+            let s = '';
+            while (i < tokens.length && tokens[i].t === 'text') s += tokens[i++].v;
+            return s;
+        }
+        function items() {
+            const list = [];
+            i++; // open
+            while (i < tokens.length && tokens[i].t !== 'close') {
+                const tok = tokens[i];
+                if (tok.t === 'key' || tok.t === 'index' || tok.t === 'prop') {
+                    // HtmlDumper marks integer keys of associative arrays as keys too, only without quotes
+                    const prev = tokens[i - 1];
+                    const quoted = prev && prev.t === 'text' && /"$/.test(prev.v);
+                    const key = tok.t === 'key' && !quoted && /^-?\d+$/.test(tok.v) ? { t: 'index', v: Number(tok.v) } : tok;
+                    i++;
+                    list.push({ key: key, value: value() });
+                } else if (tok.t === 'cut') {
+                    i++;
+                    list.cut = true;
+                } else {
+                    i++;
+                }
+            }
+            i++; // close
+            return list;
+        }
+        function value() {
+            const before = skipText();
+            const tok = tokens[i];
+            // Empty arrays are plain text: `"key" => []`, `+prop: []`
+            if (/(?:^|=>|:)\s*\[\]/.test(before)) return { t: 'array', items: [] };
+            if (!tok) return { t: 'raw', v: 'null' };
+            switch (tok.t) {
+                case 'note': {
+                    i++;
+                    const isArray = /^array:\d+$/.test(tok.v);
+                    skipText();
+                    let list = null;
+                    if (tokens[i] && tokens[i].t === 'open') list = items();
+                    while (tokens[i] && tokens[i].t === 'cut') { i++; if (list) list.cut = true; }
+                    if (isArray) return { t: 'array', items: list || [], cut: !list || list.cut };
+                    // Repeated objects ({#5 …}) and resources have no usable content
+                    if (!list || /resource$/.test(tok.v)) return { t: 'raw', v: 'null', comment: tok.title || tok.v };
+                    return { t: 'object', cls: tok.title || tok.v, items: list, cut: list.cut };
+                }
+                case 'str': {
+                    i++;
+                    // Multi-line strings: """ … """. HtmlDumper puts every line in its own span ending with an
+                    // escaped \n; DumpRenderer puts the whole body, indented to the dump depth, in one span
+                    if (/"""\s*$/.test(before)) {
+                        const parts = [tok.v];
+                        let cut = false;
+                        while (i < tokens.length && !(tokens[i].t === 'text' && tokens[i].v.indexOf('"""') !== -1)) {
+                            if (tokens[i].t === 'str') parts.push(tokens[i].v);
+                            if (tokens[i].t === 'cut') cut = true;
+                            i++;
+                        }
+                        if (tokens[i] && /"""\s*…/.test(tokens[i].v)) cut = true;
+                        return { t: 'string', v: parts.length > 1 ? parts.join('') : dedent(tok.v), cut: cut };
+                    }
+                    let cut = false;
+                    while (tokens[i] && tokens[i].t === 'cut') { i++; cut = true; }
+                    // HtmlDumper writes the cut length as plain text after the closing quote: "abc"…10
+                    if (tokens[i] && tokens[i].t === 'text' && /^"…/.test(tokens[i].v)) cut = true;
+                    return { t: 'string', v: tok.v, cut: cut };
+                }
+                case 'num':
+                    i++;
+                    return { t: 'raw', v: tok.v };
+                case 'const':
+                    i++;
+                    return /^(true|false|null)$/i.test(tok.v) ? { t: 'raw', v: tok.v.toLowerCase() } : { t: 'raw', v: 'null', comment: tok.v };
+                default:
+                    return { t: 'raw', v: 'null' };
+            }
+        }
+
+        const root = value();
+        return phpCode(root, '');
+    }
+
+    // Text of an sf-dump-str span; escaped control characters (\n, \t, \x00) come back as the real ones
+    function dumpString(span) {
+        let s = '';
+        span.childNodes.forEach(function (n) {
+            if (n.nodeType === Node.TEXT_NODE) s += n.nodeValue;
+            else if (n.classList && n.classList.contains('sf-dump-default')) s += unescapeDump(n.textContent);
+            else if (n.nodeType === Node.ELEMENT_NODE) s += n.textContent;
+        });
+        return s;
+    }
+
+    function unescapeDump(s) {
+        const map = { n: '\n', t: '\t', r: '\r', v: '\v', f: '\f', e: '\x1b', '0': '\0' };
+        return s.replace(/\\(x[0-9a-fA-F]{2}|.)/g, function (m, c) {
+            return c[0] === 'x' ? String.fromCharCode(parseInt(c.slice(1), 16)) : (map[c] !== undefined ? map[c] : m);
+        });
+    }
+
+    function dedent(raw) {
+        const lines = raw.replace(/^\n/, '').replace(/\n[ \t]*$/, '').split('\n');
+        const pad = Math.min.apply(null, lines.filter(function (l) { return l.trim(); }).map(function (l) { return l.match(/^ */)[0].length; }).concat([Infinity]));
+        return lines.map(function (l) { return l.slice(pad === Infinity ? 0 : pad); }).join('\n');
+    }
+
+    function phpString(s) {
+        // Control characters only survive in double quotes
+        if (/[\x00-\x08\x0b-\x1f\x7f]/.test(s)) {
+            return '"' + s.replace(/[\\"$]/g, '\\$&').replace(/[\x00-\x1f\x7f]/g, function (ch) {
+                const named = { '\n': '\\n', '\t': '\\t', '\r': '\\r', '\v': '\\v', '\f': '\\f', '\x1b': '\\e' }[ch];
+                return named || '\\x' + ch.charCodeAt(0).toString(16).padStart(2, '0');
+            }) + '"';
+        }
+        return "'" + s.replace(/[\\']/g, '\\$&') + "'";
+    }
+
+    function phpCode(node, indent) {
+        const inner = indent + '    ';
+        switch (node.t) {
+            case 'string':
+                return phpString(node.v) + (node.cut ? ' /* … */' : '');
+            case 'raw':
+                return node.v + (node.comment ? ' /* ' + node.comment.replace(/\*\//g, '* /') + ' */' : '');
+            case 'array':
+            case 'object': {
+                const head = node.t === 'object' ? '[ // ' + node.cls : '[';
+                if (!node.items.length && !node.cut) return node.t === 'object' ? head + '\n' + indent + ']' : '[]';
+                const list = node.t === 'array' && node.items.every(function (it, n) { return it.key.t === 'index' && it.key.v === n; });
+                const lines = node.items.map(function (it) {
+                    const key = list ? '' : (it.key.t === 'index' ? it.key.v : phpString(it.key.v)) + ' => ';
+                    return inner + key + phpCode(it.value, inner) + ',';
+                });
+                if (node.cut) lines.push(inner + '// …');
+                return head + '\n' + lines.join('\n') + '\n' + indent + ']';
+            }
+        }
+        return 'null';
+    }
+
+    // Copy buttons on the code inside an entry: dumps as PHP, queries as SQL, JSON as JSON
+    function addCodeCopy(block, type) {
+        block.querySelectorAll('pre.sf-dump').forEach(function (pre) { codeCopyButton(pre, 'php'); });
+        if (type === 'executed_query' || type === 'json_string') {
+            const box = block.querySelector('pre.box');
+            if (box) codeCopyButton(box, type === 'json_string' ? 'json' : 'sql');
+        }
+    }
+
+    function codeCopyButton(pre, lang) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'code-copy';
+        button.dataset.lang = lang;
+        // The caption is CSS content: text inside the pre would end up in search and copied text
+        button.dataset.label = CODE_COPY_LABELS[lang];
+        button.innerHTML = COPY_ICON;
+        pre.insertBefore(button, pre.firstChild);
+    }
+
+    const CODE_COPY_LABELS = { php: 'Copy as PHP', sql: 'Copy SQL', json: 'Copy JSON' };
+
+    function copyCode(button) {
+        const pre = button.parentNode;
+        const code = button.dataset.lang === 'php' ? dumpToPhp(pre) : pre.textContent.replace(/\s+$/, '');
+        post({ action: 'copy', text: code });
+        button.innerHTML = CHECK_ICON;
+        button.dataset.label = 'Copied';
+        button.classList.add('done');
+        setTimeout(function () {
+            button.innerHTML = COPY_ICON;
+            button.dataset.label = CODE_COPY_LABELS[button.dataset.lang];
+            button.classList.remove('done');
+        }, 1200);
+    }
+
+    // No label, project badge or query flags: the first block starts at the top, under the entry actions
+    function markBare(entry) {
+        const tags = entry.querySelector('.entry-tags');
+        entry.classList.toggle('bare', !Array.prototype.some.call(tags.children, function (c) { return c.textContent !== ''; }));
     }
 
     function isDump(value) {
@@ -300,10 +515,29 @@
 
     function renderQuery(c) {
         const meta = [c.connection_name, formatMs(c.time)].filter(Boolean).join(' · ');
-        const bindings = Array.isArray(c.bindings) && c.bindings.length ? c.bindings : null;
-        return '<pre class="box">' + highlightSql(c.sql) + '</pre>'
-            + (bindings ? '<div class="muted mono query-meta">bindings: ' + esc(JSON.stringify(bindings)) + '</div>' : '')
+        return '<pre class="box">' + highlightSql(querySql(c)) + '</pre>'
             + (meta ? '<div class="muted mono query-meta">' + esc(meta) + '</div>' : '');
+    }
+
+    // Laravel before 10.15 sends placeholders and bindings apart; put the values in, like toRawSql() does
+    function querySql(c) {
+        const bindings = Array.isArray(c.bindings) ? c.bindings.slice() : [];
+        if (!bindings.length) return String(c.sql);
+        // Placeholders only outside quoted strings; "??" is an escaped question mark (PostgreSQL JSON operators)
+        return String(c.sql).replace(/'(?:[^']|'')*'|"(?:[^"]|"")*"|`[^`]*`|\?\?|\?/g, function (token) {
+            if (token === '??') return '?';
+            if (token !== '?' || !bindings.length) return token;
+            return sqlValue(bindings.shift());
+        });
+    }
+
+    function sqlValue(v) {
+        if (v === null || v === undefined) return 'null';
+        if (typeof v === 'boolean') return v ? '1' : '0';
+        if (typeof v === 'number') return String(v);
+        // DateTime objects arrive as {date, timezone_type, timezone}
+        if (typeof v === 'object') v = typeof v.date === 'string' ? v.date : JSON.stringify(v);
+        return "'" + String(v).replace(/'/g, "''") + "'";
     }
 
     // SQL insights per screen: totals, repeated statements (possible N+1) and slow queries
@@ -312,6 +546,8 @@
     let slowQueryMs = 100;
     let markRepeated = true;
     let showQueryStats = true;
+    // Entries without a color match the gray dot of the color filter
+    let grayUncolored = true;
 
     // The same statement with other values: string and number literals and IN lists become placeholders
     function queryShape(sql) {
@@ -340,6 +576,8 @@
             q.issues = true;
             same.forEach(function (e) {
                 queryFlag(e, 'repeated', 'Repeated ×' + same.length, 'The same query ran ' + same.length + ' times on this screen: possible N+1');
+                // The new entry is filtered once its body is rendered
+                if (e !== entry) applyFilter(e);
             });
         }
         if (slowQueryMs > 0 && typeof c.time === 'number' && c.time >= slowQueryMs) {
@@ -444,7 +682,7 @@
                     copy: plainContext ? { lang: '', text: c.value + '\n\n' + c.context } : null
                 };
             case 'executed_query':
-                return { label: 'Query', html: renderQuery(c), copy: { lang: 'sql', text: c.sql } };
+                return { label: 'Query', html: renderQuery(c), copy: { lang: 'sql', text: querySql(c) } };
             case 'event':
                 return { label: 'Event', html: text(c.name) + (c.event ? primitive(c.event) : '') + (c.payload ? primitive(c.payload) : ''), copy: null };
             case 'job_event':
@@ -542,6 +780,25 @@
     // Screens: ray()->newScreen() archives the current messages, clear_all drops everything
 
     // Time the IDE received the request (kept on replays after a session switch), or now
+    // dd() / rd() ended the script after this entry (the IDE checks the source line). dd($a, $b) sends one dump
+    // per argument from the same line: only the last of them keeps the mark
+    let lastStop = null;
+    function markStopped(entry, request) {
+        if (entry.querySelector('.entry-stop')) return;
+        const link = entry.querySelector('.entry-meta a[data-file]');
+        const at = request.meta.dumpie_received_at || 0;
+        const where = link ? link.dataset.file + ':' + link.dataset.line : '';
+        if (lastStop && lastStop.where === where && at - lastStop.at < 2000 && lastStop.entry.isConnected) {
+            const previous = lastStop.entry.querySelector('.entry-stop');
+            if (previous) previous.remove();
+        }
+        lastStop = { entry: entry, where: where, at: at };
+        const mark = document.createElement('div');
+        mark.className = 'entry-stop';
+        mark.innerHTML = STOP_ICON + '<span>Script stopped here</span>';
+        entry.appendChild(mark);
+    }
+
     function receivedTime(request) {
         const at = request && request.meta && request.meta.dumpie_received_at;
         return (at ? new Date(at) : new Date()).toLocaleTimeString(timeFormat.locale, { hour12: timeFormat.hour12 });
@@ -616,7 +873,8 @@
             + '</div></div>'
             + '<div class="entry-actions">'
             + '<button class="icon entry-open" type="button" title="Open in editor">' + OPEN_ICON + '</button>'
-            + '<button class="icon entry-copy" type="button" title="Copy as Markdown">' + COPY_ICON + '</button></div>';
+            + '<button class="icon entry-copy-text" type="button" title="Copy text">' + COPY_ICON + '</button>'
+            + '<button class="icon entry-copy" type="button" title="Copy as Markdown">' + MARKDOWN_ICON + '</button></div>';
         if (source) entry.dataset.session = source.id;
         entry.dataset.uuid = uuid;
         entries.set(uuid, entry);
@@ -649,18 +907,38 @@
         return result.toLowerCase();
     }
 
+    // Everything that marks an entry with a color: its own color and the query flags (slow red, repeated orange)
+    function entryColors(entry) {
+        const colors = [];
+        const own = (entry.className.match(/\bcolor-(\w+)/) || [])[1];
+        if (own) colors.push(own);
+        if (entry.querySelector('.query-flag.slow')) colors.push('red');
+        if (entry.querySelector('.query-flag.repeated')) colors.push('orange');
+        if (!colors.length && grayUncolored) colors.push('gray');
+        return colors;
+    }
+
     function applyFilter(entry) {
         const q = filter.value.trim().toLowerCase();
-        const color = (entry.className.match(/\bcolor-(\w+)/) || [])[1];
         if (q !== '' && entry.searchText == null) entry.searchText = visibleText(entry.querySelector('.entry-main'));
         const textOk = q === '' || entry.searchText.indexOf(q) !== -1;
-        const colorOk = activeColors.size === 0 || activeColors.has(color);
+        const colorOk = activeColors.size === 0 || entryColors(entry).some(function (c) { return activeColors.has(c); });
         entry.classList.toggle('hidden-by-filter', !(textOk && colorOk));
     }
 
     function filtersActive() {
         return activeColors.size > 0 || filter.value.trim() !== '';
     }
+
+    // Wrapped toolbar items start a row at the left edge: no divider in front of the colors, no "·" before the query stats
+    const toolbar = document.querySelector('.toolbar');
+    const colorDots = document.getElementById('colors');
+    function markRowStarts() {
+        // The row-start margin moves the item a few pixels itself; anything after another item is far further right
+        const left = toolbar.firstElementChild.offsetLeft + 8;
+        [count, queryStats, colorDots].forEach(function (el) { el.classList.toggle('row-start', el.offsetLeft <= left); });
+    }
+    new ResizeObserver(markRowStarts).observe(toolbar);
 
     function updateCount() {
         const n = current ? current.el.querySelectorAll('.entry').length : 0;
@@ -674,6 +952,7 @@
         queryStats.hidden = !q;
         queryStats.classList.toggle('warn', !!(q && q.issues));
         empty.hidden = n > 0;
+        markRowStarts();
     }
 
     // Text of every payload of an entry with its language (php, sql, json, ...)
@@ -684,19 +963,19 @@
         });
     }
 
-    // Markdown fenced blocks keep syntax highlighting when pasted into chats and issue trackers
-    function copyEntry(entry, button) {
-        const blocks = entryParts(entry).map(function (part) {
-            return '```' + part.lang + '\n' + part.text + '\n```';
-        });
-        const origin = entry.querySelector('.entry-meta a[data-file]');
-        const header = origin ? origin.textContent + '\n' : '';
-        post({ action: 'copy', text: header + blocks.join('\n') });
+    // Only the content: plain text, or Markdown fenced blocks that keep highlighting in chats and issue trackers
+    function copyEntry(entry, button, markdown) {
+        const parts = entryParts(entry);
+        const text = markdown
+            ? parts.map(function (part) { return '```' + part.lang + '\n' + part.text + '\n```'; }).join('\n')
+            : parts.map(function (part) { return part.text; }).join('\n\n');
+        post({ action: 'copy', text: text });
 
+        const icon = button.innerHTML;
         button.innerHTML = CHECK_ICON;
         button.classList.add('done');
         setTimeout(function () {
-            button.innerHTML = COPY_ICON;
+            button.innerHTML = icon;
             button.classList.remove('done');
         }, 1200);
     }
@@ -794,6 +1073,7 @@
             block.className = 'payload';
             body.appendChild(block);
             setHtml(block, result.html);
+            addCodeCopy(block, type);
             entry.copyParts.push({
                 lang: result.copy ? result.copy.lang : '',
                 text: result.copy ? result.copy.text : null,
@@ -802,6 +1082,8 @@
             applyFilter(entry);
         });
 
+        if (entries.has(request.uuid)) markBare(entries.get(request.uuid));
+        if (request.meta && request.meta.dumpie_stopped && entries.has(request.uuid)) markStopped(entries.get(request.uuid), request);
         updateCount();
         if (nearBottom) feed.scrollTop = feed.scrollHeight;
     }
@@ -870,9 +1152,15 @@
             return;
         }
 
-        const copyButton = e.target.closest('.entry-copy');
+        const codeButton = e.target.closest('.code-copy');
+        if (codeButton) {
+            copyCode(codeButton);
+            return;
+        }
+
+        const copyButton = e.target.closest('.entry-copy, .entry-copy-text');
         if (copyButton) {
-            copyEntry(copyButton.closest('.entry'), copyButton);
+            copyEntry(copyButton.closest('.entry'), copyButton, copyButton.classList.contains('entry-copy'));
             return;
         }
 
@@ -944,6 +1232,7 @@
         const width = archivePanel.offsetWidth;
         const left = Math.max(8, Math.min(button.offsetLeft - 6, document.documentElement.clientWidth - width - 8));
         archivePanel.style.setProperty('--archive-left', left + 'px');
+        archivePanel.style.setProperty('--archive-top', (button.offsetTop + button.offsetHeight + 9) + 'px');
         archivePanel.style.setProperty('--caret-x', (center - left) + 'px');
     }
 
@@ -1177,6 +1466,26 @@
 
     let shortcuts = {};
 
+    // The empty screen lists the keyboard shortcuts, like an empty editor in the IDE, so they get learned over time
+    function renderShortcuts() {
+        const rows = [
+            ['Search', ['search']],
+            ['Pause / resume', ['pause']],
+            ['New screen', ['newScreen']],
+            ['Next / previous screen', ['nextScreen', 'previousScreen']],
+            ['Clear the screen', ['clearScreen']],
+            ['Clear all', ['clearAll']],
+        ].map(function (r) {
+            return [r[0], r[1].map(function (name) { return shortcuts[name]; }).filter(Boolean)];
+        }).filter(function (r) { return r[1].length; });
+        const box = document.getElementById('shortcuts');
+        box.innerHTML = '<div class="shortcuts-title">Keyboard shortcuts</div>' + rows.map(function (r) {
+            return '<div class="shortcut"><span>' + esc(r[0]) + '</span><span class="keys">'
+                + r[1].map(function (key) { return '<kbd>' + esc(key) + '</kbd>'; }).join('<i>/</i>') + '</span></div>';
+        }).join('');
+        box.hidden = !rows.length;
+    }
+
     function withShortcut(title, name) {
         return shortcuts[name] ? title + ' (' + shortcuts[name] + ')' : title;
     }
@@ -1189,15 +1498,58 @@
         if (typeof o.slowQueryMs === 'number') slowQueryMs = o.slowQueryMs;
         if (typeof o.repeatedQueries === 'boolean') markRepeated = o.repeatedQueries;
         if (typeof o.queryStats === 'boolean') showQueryStats = o.queryStats;
+        if (typeof o.grayUncolored === 'boolean') grayUncolored = o.grayUncolored;
         if (o.shortcuts) {
             shortcuts = o.shortcuts;
             pauseButton.title = withShortcut(paused ? 'Resume feed' : 'Pause feed', 'pause');
             searchButton.title = withShortcut('Search', 'search');
             document.getElementById('new-screen').title = withShortcut('New screen', 'newScreen');
             document.getElementById('clear').title = withShortcut('Clear all', 'clearAll');
+            renderShortcuts();
         }
+        entries.forEach(applyFilter);
         updateCount();
     }
+
+    // Off-screen JCEF never shows native title tooltips, so titles are moved to data-tip and drawn by the page
+    const tip = document.createElement('div');
+    tip.className = 'tip';
+    tip.hidden = true;
+    document.body.appendChild(tip);
+    let tipTarget = null;
+    let tipTimer = 0;
+
+    function hideTip() {
+        clearTimeout(tipTimer);
+        tipTarget = null;
+        tip.hidden = true;
+    }
+
+    document.addEventListener('mouseover', function (e) {
+        const el = e.target.closest('[title], [data-tip]');
+        if (el === tipTarget) return;
+        hideTip();
+        if (!el) return;
+        if (el.hasAttribute('title')) {
+            el.dataset.tip = el.title;
+            el.removeAttribute('title');
+        }
+        if (!el.dataset.tip) return;
+        tipTarget = el;
+        tipTimer = setTimeout(function () {
+            tip.textContent = el.dataset.tip;
+            tip.hidden = false;
+            const r = el.getBoundingClientRect();
+            const w = tip.offsetWidth;
+            const h = tip.offsetHeight;
+            const top = r.bottom + 6 + h > window.innerHeight ? r.top - 6 - h : r.bottom + 6;
+            tip.style.left = Math.max(4, Math.min(r.left + r.width / 2 - w / 2, window.innerWidth - w - 4)) + 'px';
+            tip.style.top = Math.max(4, top) + 'px';
+        }, 400);
+    });
+    document.addEventListener('mouseleave', hideTip);
+    document.addEventListener('mousedown', hideTip, true);
+    document.addEventListener('scroll', hideTip, true);
 
     newScreen('', null);
     // The IDE sends output in batches: one call per burst instead of one per request

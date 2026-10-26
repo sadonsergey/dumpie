@@ -126,7 +126,7 @@ class OutputMarkers(private val project: Project) : Disposable {
     }
 
     companion object {
-        private val ICON = IconLoader.getIcon("/icons/dumpieToolWindow.svg", OutputMarkers::class.java)
+        private val ICON = IconLoader.getIcon("/icons/dumpieGutter.svg", OutputMarkers::class.java)
         private const val MAX_HITS = 20
         private const val TOOLTIP_HITS = 3
         private const val SUMMARY_LENGTH = 100

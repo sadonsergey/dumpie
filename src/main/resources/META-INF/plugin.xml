@@ -29,6 +29,8 @@
             <li><b>Jump to code</b>: click <code>File.php:42</code>. Docker and Sail paths are mapped to your project.
                 And back: an icon in the editor gutter marks the lines that sent output.</li>
             <li><b>SQL insights</b>: repeated queries (possible N+1) and slow ones are marked, with totals per screen.</li>
+            <li><b>Copy as code</b>: a dump becomes a PHP array ready to paste into a test or a seeder, a query copies as
+                SQL with its values in place.</li>
         </ul>
 
         <h3>Many projects, many IDEs</h3>
@@ -40,20 +42,46 @@
 
         <h3>Made for reading</h3>
         <ul>
-            <li>Filter by color or text, pause the feed, collapse entries, keyboard shortcuts in the tool window.</li>
-            <li>Copy any entry as a Markdown code block, or open it in an editor tab.</li>
+            <li>Filter by color, with log levels, exceptions and slow queries included, or by text. Pause the feed,
+                collapse entries.</li>
+            <li><code>dd()</code> marks where the script stopped. A red mark on the tool window icon tells about new errors
+                while it is hidden.</li>
+            <li>Copy any entry as plain text or Markdown, or open it in an editor tab.</li>
             <li>Cleared by mistake? Restore it from the archive of cleared output.</li>
-            <li>Light and dark themes and fonts follow the IDE.</li>
+            <li>Keyboard shortcuts in the tool window, listed on the empty screen until they become a habit.</li>
+            <li>Fits a narrow tool window. Light and dark themes and fonts follow the IDE.</li>
         </ul>
 
+        <p>Screenshots and docs: <a href="https://sadonsergey.github.io/dumpie/">sadonsergey.github.io/dumpie</a>.</p>
+
         <p>Dumpie listens on <code>127.0.0.1</code> only, so nothing leaves your machine. Free and open source (MIT).
-        If Dumpie saves you time, you can <a href="https://boosty.to/sadonsergey/donate">support it on Boosty</a>.</p>
+        If Dumpie saves you time, please <a href="https://plugins.jetbrains.com/plugin/35423-dumpie/reviews">leave a review</a>: it helps others find it.
+        You can also <a href="https://boosty.to/sadonsergey/donate">support it on Boosty</a>.</p>
 
         <p><small>Dumpie is an independent project, not affiliated with or endorsed by Spatie.
         Ray and spatie/ray are products of Spatie.</small></p>
     ]]></description>
 
     <change-notes><![CDATA[
+        <p><b>0.2.2</b></p>
+        <ul>
+            <li>Copy as code: every dump, query and JSON block has its own copy button. A dump becomes a PHP array ready
+                to paste into a test or a seeder, a query copies as SQL with its values in place.</li>
+            <li>Copy an entry as plain text or as Markdown, only its content without the file name.</li>
+            <li>"Script stopped here" after <code>dd()</code>, <code>rd()</code> and <code>ray()->die()</code>.</li>
+            <li>A red mark on the tool window icon when errors arrive while it is hidden; opening it scrolls to the last
+                error.</li>
+            <li>The color filter finds everything shown in a color: log levels, exceptions, slow (red) and repeated
+                (orange) queries. Entries without a color count as gray.</li>
+            <li>Queries from older Laravel versions show and copy with their values in place of <code>?</code>.</li>
+            <li>A narrow tool window wraps the toolbar instead of hiding buttons; every button has a tooltip.</li>
+            <li>Smooth mouse wheel scrolling in the tool window and when jumping to an entry.</li>
+            <li>The empty tool window lists the keyboard shortcuts.</li>
+            <li>A calmer gutter icon that does not catch the eye when many lines have it.</li>
+            <li>The new options (error mark, gray for entries without a color) can be turned off in
+                Settings | Tools | Dumpie.</li>
+        </ul>
+
         <p><b>0.2.1</b></p>
         <ul>
             <li>Open in editor no longer uses an API deprecated in 2026.3.</li>

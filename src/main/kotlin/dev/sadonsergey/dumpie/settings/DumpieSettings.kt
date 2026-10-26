@@ -20,6 +20,8 @@ class DumpieSettings : SimplePersistentStateComponent<DumpieSettings.State>(Stat
         var pinBars by property(true)
         var whiteBackgroundInLightThemes by property(true)
         var showGutterIcons by property(true)
+        var grayUncolored by property(true)
+        var errorBadge by property(true)
         var showQueryStats by property(true)
         var markRepeatedQueries by property(true)
         var markSlowQueries by property(true)

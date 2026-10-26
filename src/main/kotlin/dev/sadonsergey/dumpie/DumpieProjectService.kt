@@ -10,17 +10,50 @@ import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
+import com.intellij.openapi.util.ScalableIcon
+import com.intellij.openapi.wm.ToolWindow
 import com.intellij.openapi.wm.ToolWindowManager
+import com.intellij.openapi.wm.ex.ToolWindowManagerListener
+import com.intellij.ui.JBColor
+import com.intellij.util.ui.UIUtil
 import dev.sadonsergey.dumpie.settings.DumpieSettings
+import dev.sadonsergey.dumpie.ui.DumpiePanel
 import java.util.concurrent.CopyOnWriteArrayList
+import java.awt.BasicStroke
+import java.awt.Component
+import java.awt.Graphics
+import java.awt.Graphics2D
+import java.awt.RenderingHints
+import java.awt.geom.Ellipse2D
+import javax.swing.Icon
 
 /**
  * Debug session of one project: keeps received requests and forwards them to every panel viewing it
  * (its own tool window and tool windows of other projects switched to this session).
  */
 @Service(Service.Level.PROJECT)
-class DumpieProjectService(private val project: Project) {
+class DumpieProjectService(private val project: Project) : Disposable {
     private val history = ArrayDeque<Entry>()
+
+    // Errors that arrived while the tool window was hidden: a badge on its icon until it is shown (EDT only)
+    private var unseenErrors = 0
+    private var lastError: String? = null
+    private var plainIcon: Icon? = null
+    private var plainTitle: String? = null
+
+    init {
+        project.messageBus.connect(this).subscribe(ToolWindowManagerListener.TOPIC, object : ToolWindowManagerListener {
+            override fun toolWindowShown(toolWindow: ToolWindow) {
+                if (toolWindow.id != TOOL_WINDOW_ID || unseenErrors == 0) return
+                val uuid = lastError
+                unseenErrors = 0
+                lastError = null
+                updateBadge(toolWindow)
+                // The panel may be created by this very show
+                if (uuid != null) ApplicationManager.getApplication().invokeLater({ DumpiePanel.reveal(project, uuid) }, project.disposed)
+            }
+        })
+    }
 
     // What clears removed, newest first, so it can be restored
     private val archive = ArrayDeque<Archived>()
@@ -34,13 +67,16 @@ class DumpieProjectService(private val project: Project) {
         val meta = request.get("meta") as? JsonObject ?: JsonObject().also { request.add("meta", it) }
         if (!meta.has(RECEIVED_AT)) meta.addProperty(RECEIVED_AT, System.currentTimeMillis())
         val json = request.toString()
+        val uuid = request.str("uuid")
+        val error: Boolean
 
         synchronized(LOCK) {
+            error = isError(uuid, payloads, types)
             if ("clear_all" in types) {
                 archive("Cleared from PHP", history.toList())
                 history.clear()
             }
-            history.addLast(Entry(sequence++, json, request.str("uuid"), types))
+            history.addLast(Entry(sequence++, json, uuid, types))
             if (history.size > MAX_HISTORY) history.removeFirst()
             listeners.forEach { it(json) }
         }
@@ -55,7 +91,7 @@ class DumpieProjectService(private val project: Project) {
             types.any { it !in SILENT_TYPES } -> activityListeners.forEach { it(project, false) }
         }
 
-        ApplicationManager.getApplication().invokeLater({ applySideEffects(types, payloads) }, project.disposed)
+        ApplicationManager.getApplication().invokeLater({ applySideEffects(types, payloads, if (error) uuid else null) }, project.disposed)
     }
 
     /** Replays the history to [listener] and subscribes it to new requests. */
@@ -98,12 +134,27 @@ class DumpieProjectService(private val project: Project) {
         if (archive.size > MAX_ARCHIVE) archive.removeLast()
     }
 
-    private fun applySideEffects(types: Set<String>, payloads: List<JsonObject>) {
+    // Under LOCK. Exceptions and error log records; laravel-ray sends the level of a record as a follow-up red color
+    private fun isError(uuid: String?, payloads: List<JsonObject>, types: Set<String>): Boolean {
+        if ("exception" in types) return true
+        val red = payloads.any { it.str("type") == "color" && (it.get("content") as? JsonObject)?.str("color") == "red" }
+        val log = payloads.any { p ->
+            p.str("type") == "application_log" && (red || ERROR_LEVEL.containsMatchIn((p.get("content") as? JsonObject)?.str("level").orEmpty()))
+        }
+        return log || red && history.any { it.uuid == uuid && "application_log" in it.types }
+    }
+
+    private fun applySideEffects(types: Set<String>, payloads: List<JsonObject>, errorUuid: String?) {
         val toolWindow = ToolWindowManager.getInstance(project).getToolWindow(TOOL_WINDOW_ID) ?: return
         when {
             "hide_app" in types -> toolWindow.hide()
             "show_app" in types -> toolWindow.activate(null)
             !toolWindow.isVisible && DumpieSettings.get().showToolWindowOnMessage -> toolWindow.show()
+        }
+        if (errorUuid != null && !toolWindow.isVisible && DumpieSettings.get().errorBadge) {
+            unseenErrors++
+            lastError = errorUuid
+            updateBadge(toolWindow)
         }
 
         payloads.filter { it.str("type") == "notify" }.forEach {
@@ -111,6 +162,54 @@ class DumpieProjectService(private val project: Project) {
             NotificationGroupManager.getInstance().getNotificationGroup(DumpieRouter.NOTIFICATION_GROUP)
                 .createNotification(text, NotificationType.INFORMATION)
                 .notify(project)
+        }
+    }
+
+    private fun updateBadge(toolWindow: ToolWindow) {
+        if (unseenErrors == 0) {
+            plainIcon?.let { toolWindow.setIcon(it) }
+            plainTitle?.let { toolWindow.stripeTitle = it }
+            plainIcon = null
+            plainTitle = null
+            return
+        }
+        val icon = plainIcon ?: toolWindow.icon?.also { plainIcon = it } ?: return
+        val title = plainTitle ?: toolWindow.stripeTitle.also { plainTitle = it }
+        toolWindow.setIcon(ErrorMarkIcon(icon))
+        toolWindow.stripeTitle = "$title: " + if (unseenErrors == 1) "1 new error" else "$unseenErrors new errors"
+    }
+
+    override fun dispose() = Unit
+
+    /**
+     * The tool window icon with a red dot in its top right corner (BadgeIconSupplier is internal API in 2024.3).
+     * Scalable, because the stripe of the new UI scales tool window icons.
+     */
+    private class ErrorMarkIcon(private val icon: Icon) : ScalableIcon {
+        override fun getScale() = (icon as? ScalableIcon)?.scale ?: 1f
+
+        override fun scale(scaleFactor: Float): Icon = ErrorMarkIcon((icon as? ScalableIcon)?.scale(scaleFactor) ?: icon)
+
+        override fun getIconWidth() = icon.iconWidth
+
+        override fun getIconHeight() = icon.iconHeight
+
+        override fun paintIcon(c: Component?, g: Graphics, x: Int, y: Int) {
+            icon.paintIcon(c, g, x, y)
+            val g2 = g.create() as Graphics2D
+            try {
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
+                val size = iconWidth * 0.42
+                val dot = Ellipse2D.Double(x + iconWidth - size, y.toDouble(), size, size)
+                // A ring in the stripe color keeps the dot apart from the icon under it
+                g2.color = UIUtil.getPanelBackground()
+                g2.stroke = BasicStroke((size / 4).toFloat())
+                g2.draw(dot)
+                g2.color = MARK_COLOR
+                g2.fill(dot)
+            } finally {
+                g2.dispose()
+            }
         }
     }
 
@@ -127,6 +226,11 @@ class DumpieProjectService(private val project: Project) {
         private const val MAX_HISTORY = 1000
         private const val MAX_ARCHIVE = 10
         internal const val RECEIVED_AT = "dumpie_received_at"
+        private val MARK_COLOR = JBColor(0xE5484D, 0xDB5C5C)
+        private val ERROR_LEVEL =Regex("""(?i)(^|\.)(error|critical|alert|emergency)$""")
+
+        /** Meta flag: the output came from dd() / rd(), the script ended there. */
+        internal const val STOPPED = "dumpie_stopped"
 
         // Payload types that only modify or control an entry, so they do not count as new output
         private val SILENT_TYPES = setOf(

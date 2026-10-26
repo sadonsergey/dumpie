@@ -511,7 +511,7 @@ class WebviewTest {
         page.locator(".entry-copy").force()
         val message = posted().single()
         assertEquals("copy", message.get("action").asString)
-        assertEquals("x.php:3\n```sql\nselect 1\n```", message.get("text").asString)
+        assertEquals("```sql\nselect 1\n```", message.get("text").asString)
     }
 
     @Test

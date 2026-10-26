@@ -6,9 +6,30 @@
 each with a link to the line that produced it. No separate app, no extra browser tab, no scrolling through
 `laravel.log`.
 
-**Website:** [sadonsergey.github.io/dumpie](https://sadonsergey.github.io/dumpie/)
+**Website:** [sadonsergey.github.io/dumpie](https://sadonsergey.github.io/dumpie/) ·
+**JetBrains Marketplace:** [Dumpie](https://plugins.jetbrains.com/plugin/35423-dumpie)
 
 ![Dumpie next to the code in PhpStorm](docs/marketplace/01-hero.png)
+
+## Already using spatie/ray? Keep your code, skip the paid desktop app
+
+Dumpie speaks the same protocol and listens on the same port, `23517`. Projects with `spatie/ray` or
+`spatie/laravel-ray` send their output to PhpStorm as they are: no code changes, no extra package, no license to buy.
+Free and open source.
+
+```php
+ray($order)->green();
+ray()->showQueries();
+ray()->measure();
+ray()->pause();
+```
+
+- **What shows up:** tables, queries, events, jobs, mails, models, exceptions, `measure()`, `pause()`, colors, labels
+  and screens.
+- **Plus what only an IDE can do:** gutter icons on the lines that sent output, links that open the file, a session per
+  project, dumps copied as PHP code.
+- **Switching:** both apps use port `23517`. Quit the desktop app, or give Dumpie its own port and move projects one at a
+  time, see [Projects with spatie/ray](#projects-with-spatieray).
 
 ## Many projects. Many IDEs. Nothing mixes up.
 
@@ -32,6 +53,7 @@ its own session and delivers it to the window that has the project open.
 
 ## Contents
 
+- [Already using spatie/ray?](#already-using-spatieray-keep-your-code-skip-the-paid-desktop-app)
 - [Many projects. Many IDEs.](#many-projects-many-ides-nothing-mixes-up)
 - [Features](#features)
 - [Installation](#installation)
@@ -71,10 +93,15 @@ its own session and delivers it to the window that has the project open.
 Requires **PhpStorm 2024.3 or newer**. Dumpie also installs in **WebStorm 2024.3 or newer**: every build is checked
 with the JetBrains Plugin Verifier against PhpStorm and WebStorm 2024.3–2026.2.
 
-1. Get `dumpie-<version>.zip` from the [Releases](https://github.com/sadonsergey/dumpie/releases) page, or build it
-   yourself (see [Building from source](#building-from-source)).
-2. Open **Settings | Plugins**, click the gear icon, choose **Install Plugin from Disk…** and select the archive.
-3. Open your project. Dumpie inspects it and turns on the sources it supports.
+1. Open **Settings | Plugins | Marketplace**, search for **Dumpie** and press **Install**, or install it from its
+   [JetBrains Marketplace page](https://plugins.jetbrains.com/plugin/35423-dumpie).
+2. Open your project. Dumpie inspects it and turns on the sources it supports.
+
+![Installing from the IDE or from JetBrains Marketplace](docs/marketplace/16-install.png)
+
+Prefer a file? Get `dumpie-<version>.zip` from the [Releases](https://github.com/sadonsergey/dumpie/releases) page (or
+build it yourself, see [Building from source](#building-from-source)), then **Settings | Plugins | ⚙ | Install Plugin
+from Disk…**
 
 ## Quick start
 
@@ -150,12 +177,19 @@ The panel follows the IDE theme and fonts:
 
 - **Open the source**: click `File.php:42` under an entry.
 - **Filter**: click color dots (several at once), or the search icon to filter by text; `Esc` clears the search.
+  Every color an entry shows counts: `ray()` colors, log levels, exceptions (red), **Slow** (red) and **Repeated**
+  (orange) queries. Entries without a color, such as plain dumps and info log records, are found under gray.
 - **Pause**: the pause button freezes the feed; new entries are counted and shown when you resume.
   A `ray()->pause()` call is never held back, so the script does not hang.
 - **Collapse**: click the colored left edge of an entry.
-- **Copy**: hover an entry and press the copy icon. The entry goes to the clipboard as a Markdown block
-  (```` ```php ````, ```` ```sql ````, ```` ```json ````) together with its `file:line`.
+- **Copy**: hover an entry and press **Copy text** for its content as plain text, or **Copy as Markdown** for
+  fenced blocks (```` ```php ````, ```` ```sql ````, ```` ```json ````).
+- **Copy code**: hover a dump, query or JSON block and press **Copy as PHP** / **Copy SQL** / **Copy JSON** in its corner. Dumps become PHP code ready
+  to paste (`['id' => 1042, 'status' => 'pending']`; objects as arrays of their properties), queries come with their
+  values in place of `?`.
 - **Open in editor**: the icon next to Copy opens the entry in an editor tab, handy for big dumps and JSON.
+- **`dd()`**: the last dump of a `dd()` (or `ray()` with `rd()` / `->die()`) is marked **Script stopped here**.
+- **Errors while the tool window is hidden**: its icon gets a red mark; opening it scrolls to the last error.
 - **Screens**: `ray()->newScreen('Checkout')` starts a fresh screen; earlier screens stay in the screen selector. The
   `×` on the active tab closes a screen.
 - **Sessions**: with several projects open, the project bar under the toolbar switches between their sessions or
@@ -173,12 +207,22 @@ The panel follows the IDE theme and fonts:
 
 ![An entry opened in an editor tab](docs/marketplace/08-open.png)
 
+![A dump copied as a PHP array into a test](docs/marketplace/11-copy.png)
+
+![Every color counts in the filter: red and gray](docs/marketplace/12-filter.png)
+
+![Script stopped here after dd()](docs/marketplace/13-dd.png)
+
+![A red mark on the tool window icon, and the error in view after opening it](docs/marketplace/14-badge.png)
+
+![The tool window at three widths](docs/marketplace/15-narrow.png)
+
 ### Keyboard shortcuts
 
-![Shortcuts and the archive of cleared output](docs/marketplace/07-keys.png)
+![Shortcuts on the empty screen and the archive of cleared output](docs/marketplace/07-keys.png)
 
 They work while the Dumpie tool window has focus, so ⌘K still commits in the editor. All of them are in
-**Tools | Dumpie** and can be remapped in **Settings | Keymap**.
+**Tools | Dumpie** and can be remapped in **Settings | Keymap**. The empty tool window lists them as a reminder.
 
 | Action | macOS | Windows / Linux |
 |---|---|---|
@@ -191,17 +235,67 @@ They work while the Dumpie tool window has focus, so ⌘K still commits in the e
 
 ## Settings
 
-**Settings | Tools | Dumpie**
+Open **Settings | Tools | Dumpie**. The page has four groups:
 
-- **Receivers (all projects)**: turn the `spatie/ray` receiver (port `23517`) and the `dump()` receiver (port `9912`)
-  on or off and change their ports.
-- **Display**: open the tool window when output arrives, keep the bars pinned while scrolling, use a white
-  background in light themes, show gutter icons.
-- **SQL queries**: query totals in the toolbar, **Repeated** marks, **Slow** marks and their threshold.
-- **This project**: which sources feed this project (`ray()`, `dump()`, log files), the log file patterns, and what was
-  detected in `composer.lock` and `.env`. **Detect Again** re-reads the project.
+- **Receivers**, **Display** and **SQL queries** apply to every project in the IDE. They are stored in `dumpie.xml`
+  in the IDE configuration directory.
+- **This project** applies to the open project only. It is stored in `.idea/workspace.xml`, so it is not shared
+  through version control.
 
-Project settings are stored in `.idea/workspace.xml`, so they are not shared through version control.
+**Apply** takes effect right away: the receivers and the log watcher restart and open tool windows pick up the new
+options. No IDE restart is needed.
+
+### Receivers (all projects)
+
+Dumpie listens on `127.0.0.1` only. When a port is taken, it retries every 5 seconds and shows a warning if another
+application holds the port. Another IDE running Dumpie does not count: in that case the IDE that owns the ports
+forwards output to the others.
+
+| Setting | Default | What it does |
+|---|---|---|
+| **spatie/ray clients, port** | On, `23517` | Receives `ray()` calls over HTTP. Change the port when another application uses `23517` (for example the Ray desktop app), and point the project at it: `RAY_PORT` for `spatie/laravel-ray`, `'port'` in `ray.php` for `spatie/ray`. |
+| **dump() / dd() via VarDumper server, port** | On, `9912` | Receives `dump()` and `dd()` from Symfony VarDumper in server mode. The project sends to it with `VAR_DUMPER_FORMAT=server` and `VAR_DUMPER_SERVER=127.0.0.1:<port>`. |
+
+### Display
+
+| Setting | Default | What it does |
+|---|---|---|
+| **Show the tool window when output arrives** | On | Opens the Dumpie tool window on new output. Turn it off to keep the window closed while you work and rely on the error mark below. |
+| **Keep the project and screen bars visible while scrolling** | On | The project chips and screen tabs stay under the toolbar. Off: they scroll away with the feed and leave more room for entries. |
+| **Use the editor background (white) in light themes** | On | In light themes the feed uses the editor's background. Off: the tool window background. Dark themes are not affected. |
+| **Show an icon in the editor gutter on lines that produced output** | On | Marks lines that sent output with an icon. Hover it to see what the line sent, click it to jump to the entry. Turning it off also removes the icons already shown. |
+| **Mark the tool window icon when errors arrive while it is hidden** | On | Exceptions and log records of level error, critical, alert or emergency put a red mark on the tool window icon; its tooltip counts them. Showing the tool window clears the mark and scrolls to the last error. |
+| **Treat entries without a color as gray in the color filter** | On | The gray dot also finds entries that have no color: plain `dump()` output, info log records, `ray()` calls without a color. Off: gray finds only `ray()->gray()` and debug log records. |
+
+### SQL queries
+
+| Setting | Default | What it does |
+|---|---|---|
+| **Show the number of queries and their total time in the toolbar** | On | Shows `12 queries · 48.20 ms` for the current screen. The numbers turn orange when the screen has repeated or slow queries. |
+| **Mark repeated queries (possible N+1)** | On | The same statement with other values that ran 3 or more times on one screen is marked **Repeated**. Such queries are found by the orange filter. |
+| **Mark queries slower than … ms** | On, `100` | Queries that took longer are marked **Slow** and found by the red filter. Any value from 1 to 600000 ms. |
+
+### This project
+
+Dumpie inspects a project the first time it is opened and fills this group from `composer.lock`, `.env` and the log
+directories. After that your changes are kept; **Detect Again** repeats the inspection.
+
+| Setting | Default | What it does |
+|---|---|---|
+| **ray() output** | On | Shows `ray()` output that belongs to this project. The note under it says whether `spatie/ray` or `spatie/laravel-ray` was found in `composer.lock`; a global install works too. |
+| **dump() output** | On if `symfony/var-dumper` is in `composer.lock` | Shows `dump()` and `dd()` output of this project. The note says whether `VAR_DUMPER_FORMAT` is already set in `.env`. |
+| **Add to .env** | Shown when it is needed | Appears when the project has VarDumper but `.env` does not send dumps yet. Adds `VAR_DUMPER_FORMAT=server` and `VAR_DUMPER_SERVER` (`host.docker.internal` for Laravel Sail projects); an existing key is updated, never added twice. |
+| **Log files** | On if `storage/logs` or `var/log` exists | Follows the project's log files and shows every new record with its stack trace. Expects the Monolog line format (`[2026-10-26 12:00:00] local.ERROR: message`), the default in Laravel and Symfony. Only records written after the project was opened are shown. |
+| **Log file patterns** | `storage/logs/*.log` or `var/log/*.log` | Which files to follow: glob patterns relative to the project root, one per line. Wildcards are allowed in the file name only, for example `storage/logs/*.log` or `storage/logs/worker-*.log`. |
+| **Detect Again** | | Inspects the project again and overwrites **dump() output**, **Log files** and the log patterns with what it finds. |
+
+Log records are colored by level: emergency, alert, critical and error in red, warning in orange, notice in blue, debug
+in gray. Info records have no color.
+
+### Remapping the shortcuts
+
+The shortcuts of the tool window are actions in **Tools | Dumpie** and can be remapped in **Settings | Keymap**
+(search for "Dumpie"). See [Keyboard shortcuts](#keyboard-shortcuts) for the defaults.
 
 ## Troubleshooting
 
@@ -248,8 +342,12 @@ Dumpie is a young project, and I am always happy to make it better. Ideas, bug r
 
 ## Support the project
 
-Dumpie is free and will stay free. If it saves you time, you can support its development with a donation on
-[Boosty](https://boosty.to/sadonsergey/donate). A star on GitHub helps too: it makes the project easier to find.
+Dumpie is free and will stay free. If it saves you time:
+
+- **Leave a review** on [JetBrains Marketplace](https://plugins.jetbrains.com/plugin/35423-dumpie/reviews). It helps other PHP developers find Dumpie and tells me what
+  to build next.
+- **Star the repository** on GitHub: it makes the project easier to find.
+- **Donate** on [Boosty](https://boosty.to/sadonsergey/donate) to support its development.
 
 ## License
 
@@ -266,3 +364,7 @@ In plain words:
 The [LICENSE](LICENSE) file is the legally binding text; this summary is for convenience only.
 
 Dumpie is an independent project, not affiliated with or endorsed by Spatie. Ray and spatie/ray are products of Spatie.
+
+---
+
+<p align="center">Built by a developer for developers, with love</p>

@@ -1,0 +1,330 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dumpie — отладочный вывод PHP прямо в PhpStorm</title>
+<meta name="description" content="dump(), dd(), логи, SQL-запросы, исключения и ray() в окне PhpStorm, у каждой записи ссылка на строку кода. Бесплатно и с открытым исходным кодом.">
+<meta property="og:title" content="Dumpie — отладочный вывод PHP прямо в PhpStorm">
+<meta property="og:description" content="dump(), dd(), логи, SQL и ray() рядом с вашим кодом. Бесплатно и с открытым исходным кодом.">
+<meta property="og:image" content="https://sadonsergey.github.io/dumpie/marketplace/01-hero.png">
+<link rel="icon" href="../icon.svg" type="image/svg+xml">
+<link rel="alternate" hreflang="en" href="https://sadonsergey.github.io/dumpie/">
+<link rel="alternate" hreflang="ru" href="https://sadonsergey.github.io/dumpie/ru/">
+<link rel="alternate" hreflang="x-default" href="https://sadonsergey.github.io/dumpie/">
+<link rel="stylesheet" href="../site.css">
+</head>
+<body>
+
+<nav>
+    <div class="wrap">
+        <a class="brand" href="#"><img src="../icon.svg" alt="">Dumpie</a>
+        <div class="links">
+            <a href="#ray" class="hide-sm">Используете ray()?</a>
+            <a href="#features">Возможности</a>
+            <a href="#start" class="hide-sm">Быстрый старт</a>
+            <a href="#shortcuts" class="hide-sm">Горячие клавиши</a>
+            <a href="#support" class="hide-sm">Поддержать</a>
+            <a href="https://github.com/sadonsergey/dumpie">GitHub</a>
+            <span class="lang"><a href="../" hreflang="en" lang="en">EN</a><b>RU</b></span>
+        </div>
+    </div>
+</nav>
+
+<header class="hero">
+    <div class="wrap">
+        <span class="badge">Бесплатно и open source · PhpStorm и WebStorm 2024.3+</span>
+        <h1>Отладочный вывод PHP прямо в PhpStorm</h1>
+        <p class="lead"><code>dump()</code>, <code>dd()</code>, записи логов, SQL-запросы, исключения и вызовы <code>ray()</code> в окне рядом
+            с кодом. У каждой записи есть ссылка на строку, которая её отправила.</p>
+        <div class="cta">
+            <a class="btn primary" href="https://plugins.jetbrains.com/plugin/35423-dumpie">Установить из JetBrains Marketplace</a>
+            <a class="btn" href="https://github.com/sadonsergey/dumpie">Открыть на GitHub</a>
+        </div>
+        <div class="note">Или прямо в IDE:
+            <span class="path"><span>Settings</span><i>›</i><span>Plugins</span><i>›</i><span>Marketplace</span><i>›</i><span><b>Dumpie</b></span></span></div>
+        <div class="shot"><img src="../marketplace/01-hero.png" alt="Dumpie рядом с кодом в PhpStorm" width="2560" height="1600"></div>
+    </div>
+</header>
+
+<section id="ray" class="switch">
+    <div class="wrap">
+        <div class="switch-card">
+            <div>
+                <span class="switch-tag">Уже используете spatie/ray?</span>
+                <h2>Ваши ray() работают как есть, без платного десктоп-приложения</h2>
+                <p>Dumpie понимает тот же протокол и слушает тот же порт, <code>23517</code>. Проекты со <code>spatie/ray</code> или
+                    <code>spatie/laravel-ray</code> отправляют вывод в PhpStorm без изменений: не нужно править код, ставить
+                    пакеты или покупать лицензию.</p>
+                <p>Бесплатно, с открытым исходным кодом и прямо в IDE.</p>
+            </div>
+            <div>
+                <pre>ray($order)-&gt;green();
+ray()-&gt;showQueries();
+ray()-&gt;measure();
+ray()-&gt;pause();</pre>
+                <ul>
+                    <li>Таблицы, запросы, события, джобы, письма, модели, исключения, <code>measure()</code>, <code>pause()</code>, цвета, метки и экраны</li>
+                    <li>И то, что умеет только IDE: иконки в гаттере у строк с выводом, ссылки, открывающие файл, своя сессия у каждого проекта</li>
+                    <li>Оба приложения используют порт 23517: закройте десктоп-приложение или дайте Dumpie свой порт и переводите проекты по одному</li>
+                </ul>
+                <small>Ray и spatie/ray — продукты Spatie. Dumpie — независимый проект, не связан со Spatie и не одобрен ею.</small>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section id="features">
+    <div class="wrap">
+        <h2>Всё, что выводит ваше PHP-приложение, там же, где вы пишете код</h2>
+        <p class="section-lead">Без отдельного приложения, лишней вкладки браузера и прокрутки <code>laravel.log</code>. Dumpie ловит вывод
+            Symfony VarDumper, ваших лог-файлов и протокола <code>spatie/ray</code>.</p>
+
+        <div class="feature">
+            <div class="text">
+                <h3>От кода к его выводу</h3>
+                <p>Строки, которые что-то вывели, получают иконку в гаттере редактора. Наведите на неё, чтобы увидеть, что именно, или кликните,
+                    чтобы перейти к записи. И в обратную сторону: каждая запись ссылается на свой файл и строку, пути из Docker и Sail тоже.</p>
+            </div>
+            <div class="media"><img src="../marketplace/06-gutter.png" alt="Иконка в гаттере с подсказкой и найденная запись" loading="lazy" width="2560" height="1600"></div>
+        </div>
+
+        <div class="feature flip">
+            <div class="text">
+                <h3>SQL под контролем</h3>
+                <p>Запросы, которые снова и снова выполняются с разными значениями, помечаются <b>Repeated</b>: классический N+1. Медленные
+                    помечаются <b>Slow</b>, а тулбар показывает, сколько запросов выполнил экран и сколько времени они заняли.</p>
+            </div>
+            <div class="media"><img src="../marketplace/05-sql.png" alt="Повторяющиеся и медленные запросы" loading="lazy" width="2560" height="1600"></div>
+        </div>
+
+        <div class="feature">
+            <div class="text">
+                <h3>Исключения и логи, которые удобно читать</h3>
+                <p>Подсвеченный код вокруг строки с ошибкой, свёрнутые фреймы vendor, уровни логов цветом. Фильтр по цвету или тексту, пауза
+                    ленты, сворачивание уже прочитанного.</p>
+            </div>
+            <div class="media"><img src="../marketplace/04-errors.png" alt="Исключение с кодом и только ошибки" loading="lazy" width="2560" height="1600"></div>
+        </div>
+
+        <div class="feature flip">
+            <div class="text">
+                <h3>Дамп копируется как рабочий PHP-код</h3>
+                <p>У каждого дампа, запроса и JSON-блока своя кнопка копирования. Дамп превращается в PHP-массив, который можно сразу вставить
+                    в тест или сидер, а объект — в массив его свойств. Запросы копируются как SQL с подставленными значениями, готовые к запуску.</p>
+                <p>Нужна запись целиком? Скопируйте её обычным текстом или в Markdown с подсвеченными блоками кода, без лишних имён файлов.</p>
+            </div>
+            <div class="media"><img src="../marketplace/11-copy.png" alt="Дамп, скопированный в тест как PHP-массив" loading="lazy" width="2560" height="1600"></div>
+        </div>
+
+        <div class="feature">
+            <div class="text">
+                <h3>Фильтр понимает каждый цвет</h3>
+                <p>Что показано цветом, то этим цветом и находится: <code>ray()->red()</code>, уровни логов, исключения, медленные запросы
+                    красным, повторяющиеся оранжевым. Обычные дампы и info-записи лежат под серым: одним кликом их можно скрыть или оставить только их.</p>
+            </div>
+            <div class="media"><img src="../marketplace/12-filter.png" alt="Красный и серый цветовые фильтры" loading="lazy" width="2560" height="1600"></div>
+        </div>
+
+        <div class="feature flip">
+            <div class="text">
+                <h3>Видно, где dd() остановил скрипт</h3>
+                <p>Последний дамп <code>dd()</code> помечается <b>Script stopped here</b>, так что отсутствие записей после него больше не загадка.
+                    <code>rd()</code> и <code>ray()->die()</code> получают ту же метку.</p>
+            </div>
+            <div class="media"><img src="../marketplace/13-dd.png" alt="Метка Script stopped here после dd()" loading="lazy" width="2560" height="1600"></div>
+        </div>
+
+        <div class="feature">
+            <div class="text">
+                <h3>Ошибки не проскочат</h3>
+                <p>Держите окно скрытым, пока работаете: когда приходит исключение или лог уровня error, на его иконке появляется красная метка,
+                    а в подсказке — число новых ошибок. Откройте окно, и последняя ошибка уже на виду.</p>
+            </div>
+            <div class="media"><img src="../marketplace/14-badge.png" alt="Красная метка на иконке окна и найденная ошибка" loading="lazy" width="2560" height="1600"></div>
+        </div>
+
+        <div class="feature flip">
+            <div class="text">
+                <h3>Много проектов, ничего не путается</h3>
+                <p>У каждого проекта своя сессия со счётчиком непрочитанного. Сессию любого проекта можно открыть из любого окна или смотреть
+                    все сразу в одной ленте с метками проектов.</p>
+            </div>
+            <div class="media"><img src="../marketplace/02-sessions.png" alt="Сессии двух проектов" loading="lazy" width="2560" height="1600"></div>
+        </div>
+
+        <div class="feature">
+            <div class="text">
+                <h3>Несколько IDE одновременно</h3>
+                <p>PhpStorm и WebStorm рядом или две версии IDE? Вывод каждого проекта приходит в то окно, где он открыт, а
+                    <code>ray()->pause()</code> можно продолжить из любого.</p>
+            </div>
+            <div class="media"><img src="../marketplace/03-ides.png" alt="Вывод, распределённый между IDE" loading="lazy" width="2560" height="1600"></div>
+        </div>
+
+        <div class="feature flip">
+            <div class="text">
+                <h3>Любая запись открывается в редакторе</h3>
+                <p>Большие дампы, JSON и SQL открываются во вкладке редактора рядом с кодом, с подсветкой, поиском и сворачиванием IDE.</p>
+            </div>
+            <div class="media"><img src="../marketplace/08-open.png" alt="Запись, открытая во вкладке редактора" loading="lazy" width="2560" height="1600"></div>
+        </div>
+
+        <div class="feature">
+            <div class="text">
+                <h3>Удобно даже в узком окне</h3>
+                <p>Сожмите окно рядом с кодом: тулбар переносится, а не прячет кнопки. Сначала уходят цветные фильтры, потом счётчики,
+                    и всё стоит ровно по левому краю. У каждой иконки есть подсказка.</p>
+            </div>
+            <div class="media"><img src="../marketplace/15-narrow.png" alt="Окно Dumpie трёх разной ширины" loading="lazy" width="2560" height="1600"></div>
+        </div>
+    </div>
+</section>
+
+<section class="alt">
+    <div class="wrap">
+        <h2>Мелочи, из которых всё складывается</h2>
+        <p class="section-lead">Чтобы быстро читать много вывода и ничего из него не терять.</p>
+        <div class="grid">
+            <div class="card"><h4>Ничего не теряется</h4><p>Всё, что убрала очистка, попадает в архив и возвращается в тот проект, откуда пришло.</p></div>
+            <div class="card"><h4>Экраны</h4><p><code>ray()->newScreen()</code> или ⌘N начинают новый экран, а прежние остаются в одном клике.</p></div>
+            <div class="card"><h4>Текст или Markdown</h4><p>Любая запись копируется обычным текстом или блоками кода, которые сохраняют подсветку в чатах и задачах.</p></div>
+            <div class="card"><h4>Как ваша IDE</h4><p>Светлая и тёмная тема, шрифты, цвета синтаксиса и формат времени берутся из IDE.</p></div>
+            <div class="card"><h4>Подсказки при настройке</h4><p>Пустое окно показывает, чего не хватает проекту, и предлагает кнопку <b>Add to .env</b>.</p></div>
+            <div class="card"><h4>Только локально</h4><p>Dumpie слушает <code>127.0.0.1</code>. Ничего не уходит с вашей машины.</p></div>
+        </div>
+    </div>
+</section>
+
+<section id="start">
+    <div class="wrap">
+        <h2>Быстрый старт</h2>
+        <p class="section-lead">Работает в любом проекте с <code>symfony/var-dumper</code>, а он есть в Laravel и Symfony.</p>
+        <div class="steps">
+            <div class="step">
+                <h4>Установите плагин</h4>
+                <p>Settings › Plugins › Marketplace, найдите <b>Dumpie</b> и нажмите Install. Или установите его со страницы на
+                    <a href="https://plugins.jetbrains.com/plugin/35423-dumpie">JetBrains Marketplace</a>.</p>
+            </div>
+            <div class="step">
+                <h4>Добавьте строку в <code>.env</code></h4>
+                <p>Или нажмите <b>Add to .env</b> в окне Dumpie.</p>
+                <pre>VAR_DUMPER_FORMAT=server</pre>
+            </div>
+            <div class="step">
+                <h4>Выведите что-нибудь</h4>
+                <p>Вывод появится в окне, а не на странице. Проектам со <code>spatie/ray</code> настройка вообще не нужна.</p>
+                <pre>dump($order);</pre>
+            </div>
+        </div>
+        <div class="shots">
+            <figure>
+                <div class="media"><img src="../marketplace/16-install.png" alt="Установка Dumpie из IDE и с JetBrains Marketplace" loading="lazy" width="2560" height="1600"></div>
+                <figcaption><b>1</b> Установка из IDE или с JetBrains Marketplace</figcaption>
+            </figure>
+            <figure>
+                <div class="media"><img src="../marketplace/09-setup.png" alt="Подсказки по настройке в пустом окне" loading="lazy" width="2560" height="1600"></div>
+                <figcaption><b>2</b> Пустое окно показывает, чего не хватает проекту</figcaption>
+            </figure>
+        </div>
+        <p class="offline">Нет доступа к Marketplace? Скачайте zip из <a href="https://github.com/sadonsergey/dumpie/releases/latest">Releases</a>
+            и выберите Settings › Plugins › ⚙ › Install Plugin from Disk…</p>
+    </div>
+</section>
+
+<section id="shortcuts" class="alt">
+    <div class="wrap feature">
+        <div class="text">
+            <h2>Сначала клавиатура</h2>
+            <p>Горячие клавиши работают в окне Dumpie и переназначаются в Settings | Keymap. У редактора остаются свои: ⌘K там
+                по-прежнему делает коммит. На Windows и Linux вместо ⌘ — Ctrl. Пока клавиши не войдут в привычку, пустое окно
+                показывает их список, вместе с переназначенными.</p>
+            <table>
+                <tr><td>Очистить всё</td><td><kbd>⌘K</kbd></td></tr>
+                <tr><td>Очистить текущий экран</td><td><kbd>⌘L</kbd></td></tr>
+                <tr><td>Новый экран</td><td><kbd>⌘N</kbd></td></tr>
+                <tr><td>Пауза / продолжить</td><td><kbd>⌘P</kbd></td></tr>
+                <tr><td>Поиск</td><td><kbd>⌘F</kbd></td></tr>
+                <tr><td>Следующий / предыдущий экран</td><td><kbd>⌘]</kbd> <kbd>⌘[</kbd></td></tr>
+            </table>
+        </div>
+        <div class="media"><img src="../marketplace/07-keys.png" alt="Горячие клавиши на пустом экране и архив очищенного вывода" loading="lazy" width="2560" height="1600"></div>
+    </div>
+</section>
+
+<section id="settings">
+    <div class="wrap">
+        <h2>Настройки</h2>
+        <p class="section-lead">Settings | Tools | Dumpie. Приёмники, отображение и SQL действуют на все проекты, последняя группа — только на открытый проект. Apply применяет изменения сразу, без перезапуска IDE.</p>
+        <div class="settings">
+            <div class="set-col">
+                <div class="set-card">
+                    <h3>Отображение<small>Все проекты</small></h3>
+                    <div class="opt"><div class="opt-head"><b>Показывать окно при выводе</b><span>Вкл.</span></div><p>Открывает Dumpie, когда что-то приходит. Выключите, чтобы не отвлекаться, и полагайтесь на метку ошибок.</p></div>
+                    <div class="opt"><div class="opt-head"><b>Закреплённые панели проектов и экранов</b><span>Вкл.</span></div><p>Если выключить, панели уезжают вместе с лентой и освобождают место.</p></div>
+                    <div class="opt"><div class="opt-head"><b>Белый фон в светлых темах</b><span>Вкл.</span></div><p>Лента в цвет редактора, а не серого фона окна.</p></div>
+                    <div class="opt"><div class="opt-head"><b>Иконки в гаттере</b><span>Вкл.</span></div><p>Отмечают строки, которые что-то вывели. Наведите, чтобы посмотреть, кликните, чтобы перейти к записи.</p></div>
+                    <div class="opt"><div class="opt-head"><b>Метка ошибок на иконке</b><span>Вкл.</span></div><p>Исключения и логи уровня error, пока окно скрыто. При открытии окно прокручивается к последней ошибке.</p></div>
+                    <div class="opt"><div class="opt-head"><b>Записи без цвета считаются серыми</b><span>Вкл.</span></div><p>Серый кружок находит и обычные дампы, info-логи и <code>ray()</code> без цвета.</p></div>
+                </div>
+                <div class="set-card">
+                    <h3>Приёмники<small>Все проекты</small></h3>
+                    <div class="opt"><div class="opt-head"><b>spatie/ray clients</b><span>23517</span></div><p>Принимает <code>ray()</code> по HTTP. Если порт занят другим приложением, выберите другой и укажите его в проекте в <code>RAY_PORT</code>.</p></div>
+                    <div class="opt"><div class="opt-head"><b>dump() / dd() server</b><span>9912</span></div><p>Принимает дампы VarDumper. Проект отправляет их с <code>VAR_DUMPER_FORMAT=server</code> и <code>VAR_DUMPER_SERVER</code>.</p></div>
+                    <p class="set-note">Оба слушают только <code>127.0.0.1</code>. Занятый порт проверяется заново каждые 5 секунд.</p>
+                </div>
+            </div>
+            <div class="set-col">
+                <div class="set-card">
+                    <h3>Этот проект<small>Открытый проект</small></h3>
+                    <div class="opt"><div class="opt-head"><b>ray() output</b><span>Вкл.</span></div><p>Показывает вызовы <code>ray()</code> этого проекта и есть ли <code>spatie/ray</code> в <code>composer.lock</code>.</p></div>
+                    <div class="opt"><div class="opt-head"><b>dump() output</b><span>Автоопределение</span></div><p>Включается, если установлен <code>symfony/var-dumper</code>. <b>Add to .env</b> добавляет две нужные строки, для Sail — с <code>host.docker.internal</code>.</p></div>
+                    <div class="opt"><div class="opt-head"><b>Log files</b><span>Автоопределение</span></div><p>Следит за логами Monolog в <code>storage/logs</code> или <code>var/log</code>: только новые записи, цвет по уровню.</p></div>
+                    <div class="opt"><div class="opt-head"><b>Шаблоны лог-файлов</b><span><code>*.log</code></span></div><p>Glob-шаблоны от корня проекта, по одному в строке, звёздочки только в имени файла.</p></div>
+                    <div class="opt"><div class="opt-head"><b>Detect Again</b></div><p>Заново читает <code>composer.lock</code>, <code>.env</code> и папки логов.</p></div>
+                    <p class="set-note">Заполняется при первом открытии проекта, дальше ваши изменения сохраняются.</p>
+                </div>
+                <div class="set-card">
+                    <h3>SQL-запросы<small>Все проекты</small></h3>
+                    <div class="opt"><div class="opt-head"><b>Итоги запросов в тулбаре</b><span>Вкл.</span></div><p>Число запросов экрана и их общее время. Становится оранжевым, если есть на что посмотреть.</p></div>
+                    <div class="opt"><div class="opt-head"><b>Повторяющиеся запросы</b><span>Вкл.</span></div><p>Один и тот же запрос с другими значениями 3 раза и больше на одном экране: похоже на N+1.</p></div>
+                    <div class="opt"><div class="opt-head"><b>Медленные запросы</b><span>100 мс</span></div><p>Всё, что дольше, помечается <b>Slow</b> и находится красным фильтром.</p></div>
+                </div>
+            </div>
+        </div>
+        <p class="offline">Подробно о каждой опции, с примерами: <a href="https://github.com/sadonsergey/dumpie#settings">README › Settings</a> (на английском)</p>
+    </div>
+</section>
+
+<section id="support" class="review">
+    <div class="wrap">
+        <div class="review-card">
+            <div>
+                <h2>Нравится Dumpie?</h2>
+                <p>Dumpie бесплатный и таким останется. Короткий отзыв на JetBrains Marketplace помогает другим PHP-разработчикам его найти,
+                    а донат помогает проекту развиваться.</p>
+            </div>
+            <div class="review-actions">
+                <a class="btn primary" href="https://plugins.jetbrains.com/plugin/35423-dumpie/reviews">Оставить отзыв</a>
+                <a class="btn" href="https://boosty.to/sadonsergey/donate">Поддержать на Boosty</a>
+            </div>
+        </div>
+    </div>
+</section>
+
+<footer>
+    <div class="wrap">
+        <div><span class="made">Создано разработчиком для разработчиков, с любовью</span><br>
+            Dumpie — бесплатный проект с открытым исходным кодом под <a href="https://github.com/sadonsergey/dumpie/blob/main/LICENSE">лицензией MIT</a>.<br>
+            Не связан со Spatie и не одобрен ею. Ray и spatie/ray — продукты Spatie.</div>
+        <div>
+            <a class="support" href="https://boosty.to/sadonsergey/donate">Поддержать проект на Boosty</a><br>
+            <a href="https://plugins.jetbrains.com/plugin/35423-dumpie">JetBrains Marketplace</a> · <a href="https://plugins.jetbrains.com/plugin/35423-dumpie/reviews">Оставить отзыв</a><br>
+            <a href="https://github.com/sadonsergey/dumpie/issues">Сообщить о проблеме</a> ·
+            <a href="https://github.com/sadonsergey/dumpie/discussions">Обсуждения</a>
+        </div>
+    </div>
+</footer>
+
+</body>
+</html>

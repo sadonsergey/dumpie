@@ -36,6 +36,14 @@ object FileResolver {
         return 0
     }
 
+    /** The local copy of a file PHP reported, found like [resolve] but with plain java.io, so any thread can use it. */
+    fun localFile(project: Project, path: String): File? {
+        File(path).takeIf { it.isFile }?.let { return it }
+        val base = project.basePath ?: return null
+        val segments = suffixMatch(base, path).takeIf { it > 0 } ?: return null
+        return File(base, path.trim('/').split('/').takeLast(segments).joinToString("/"))
+    }
+
     fun open(project: Project, path: String, line: Int) {
         val file = resolve(project, path) ?: return
         OpenFileDescriptor(project, file, maxOf(line - 1, 0), 0).navigate(true)

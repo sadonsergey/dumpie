@@ -75,6 +75,7 @@
                 (orange) queries. Entries without a color count as gray.</li>
             <li>Queries from older Laravel versions show and copy with their values in place of <code>?</code>.</li>
             <li>A narrow tool window wraps the toolbar instead of hiding buttons; every button has a tooltip.</li>
+            <li>Smooth mouse wheel scrolling in the tool window and when jumping to an entry.</li>
             <li>The empty tool window lists the keyboard shortcuts.</li>
             <li>A calmer gutter icon that does not catch the eye when many lines have it.</li>
             <li>The new options (error mark, gray for entries without a color) can be turned off in

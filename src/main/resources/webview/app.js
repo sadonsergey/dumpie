@@ -1419,13 +1419,48 @@
         if (active) active.scrollIntoView({ block: 'nearest', inline: 'nearest' });
     }
 
+    // Off-screen JCEF applies a mouse wheel notch as one jump; animate those. Trackpads send many small pixel
+    // deltas that are smooth already, and inner scrollable blocks (long dumps, lists) scroll on their own first
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+    let wheelTarget = null;
+    let wheelFrame = 0;
+
+    function scrollsInside(el, dy) {
+        for (; el && el !== feed; el = el.parentElement) {
+            if (el.scrollHeight <= el.clientHeight || !/auto|scroll/.test(getComputedStyle(el).overflowY)) continue;
+            if (dy < 0 ? el.scrollTop > 0 : el.scrollTop + el.clientHeight < el.scrollHeight - 1) return true;
+        }
+        return false;
+    }
+
+    function wheelStep() {
+        const diff = wheelTarget - feed.scrollTop;
+        if (Math.abs(diff) < 1) {
+            feed.scrollTop = wheelTarget;
+            wheelTarget = null;
+            wheelFrame = 0;
+            return;
+        }
+        feed.scrollTop += diff * 0.22;
+        wheelFrame = requestAnimationFrame(wheelStep);
+    }
+
+    feed.addEventListener('wheel', function (e) {
+        const dy = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY;
+        if (reducedMotion.matches || e.ctrlKey || e.deltaX || Math.abs(dy) < 40 || scrollsInside(e.target, dy)) return;
+        e.preventDefault();
+        const max = feed.scrollHeight - feed.clientHeight;
+        wheelTarget = Math.max(0, Math.min(max, (wheelTarget === null ? feed.scrollTop : wheelTarget) + dy));
+        if (!wheelFrame) wheelFrame = requestAnimationFrame(wheelStep);
+    }, { passive: false });
+
     // A click on a gutter icon in the editor: bring the entry into view, on whichever screen it is
     function reveal(uuid) {
         const entry = entries.get(uuid);
         if (!entry) return;
         const index = screens.findIndex(function (s) { return s.el.contains(entry); });
         if (index >= 0 && screens[index] !== current) showScreen(index);
-        entry.scrollIntoView({ block: 'center' });
+        entry.scrollIntoView({ block: 'center', behavior: reducedMotion.matches ? 'auto' : 'smooth' });
         entry.classList.remove('flash');
         void entry.offsetWidth;
         entry.classList.add('flash');

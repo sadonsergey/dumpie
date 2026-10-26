@@ -1,15 +1,45 @@
 name: Build
 
+# dev: no CI. A pull request into main runs the tests, the build and the Plugin Verifier;
+# the merge into main builds the plugin and drafts the release of its version.
 on:
   push:
     branches: [main]
   pull_request:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
+  test:
+    name: Tests
+    if: github.event_name != 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      # System libraries for the headless Chromium of the webview tests; same version as the Java client
+      - name: Install browser dependencies
+        run: npx --yes playwright@1.63.0 install-deps chromium
+
+      - name: Run tests
+        run: ./gradlew test
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: test-reports
+          path: build/reports/tests
+
   build:
     name: Build plugin
     runs-on: ubuntu-latest
@@ -33,6 +63,7 @@ jobs:
 
   verify:
     name: Verify ${{ matrix.ide }}
+    if: github.event_name != 'push'
     needs: build
     runs-on: ubuntu-latest
     strategy:
@@ -75,3 +106,46 @@ jobs:
         with:
           name: verifier-report-${{ strategy.job-index }}
           path: build/reports/pluginVerifier
+
+  release:
+    name: Draft release
+    if: github.event_name == 'push'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: dumpie-plugin
+          path: dist
+
+      # A published version is never touched; a draft of it gets the new archive
+      - name: Create or update the draft
+        run: |
+          version=$(sed -n 's/^pluginVersion *= *//p' gradle.properties)
+          tag="v$version"
+          state=$(gh release list --limit 100 --json tagName,isDraft --jq ".[] | select(.tagName == \"$tag\") | .isDraft")
+          if [ "$state" = "false" ]; then
+            echo "::notice::$tag is already released; bump pluginVersion to draft a new release"
+          elif [ "$state" = "true" ]; then
+            gh release upload "$tag" dist/*.zip --clobber
+          else
+            python3 - "$version" > notes.md <<'EOF'
+          import re, sys
+          version = sys.argv[1]
+          notes = open('src/main/resources/META-INF/plugin.xml').read().split('<change-notes>')[1]
+          block = re.search(r'<p><b>' + re.escape(version) + r'</b></p>\s*<ul>(.*?)</ul>', notes, re.S)
+          for item in re.findall(r'<li>(.*?)</li>', block.group(1) if block else '', re.S):
+              print('- ' + re.sub(r'\s+', ' ', re.sub(r'<[^>]+>', '', item)).strip())
+          print()
+          print('**Install:** **Settings | Plugins | Marketplace**, search for **Dumpie**, or open it on '
+                '[JetBrains Marketplace](https://plugins.jetbrains.com/plugin/35423-dumpie). '
+                'Offline? Download `dumpie-%s.zip` below, then **Settings | Plugins | ⚙ | Install Plugin from Disk…**' % version)
+          EOF
+            gh release create "$tag" dist/*.zip --draft --target "$GITHUB_SHA" --title "Dumpie $version" --notes-file notes.md
+          fi

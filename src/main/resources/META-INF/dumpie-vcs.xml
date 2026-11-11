@@ -1,0 +1,5 @@
+<idea-plugin>
+    <extensions defaultExtensionNs="com.intellij">
+        <checkinHandlerFactory implementation="dev.sadonsergey.dumpie.DebugCallCheckFactory"/>
+    </extensions>
+</idea-plugin>

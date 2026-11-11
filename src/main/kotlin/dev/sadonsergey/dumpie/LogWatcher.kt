@@ -107,36 +107,10 @@ class LogWatcher(private val project: Project) : Disposable {
         record?.let { send(file, it) }
     }
 
-    private class Record(val line: Int, val channel: String, val level: String, val message: String, val rest: StringBuilder)
+    internal class Record(val line: Int, val channel: String, val level: String, val message: String, val rest: StringBuilder)
 
     private fun send(file: File, record: Record) {
-        val origin = JsonObject().apply {
-            addProperty("file", file.path)
-            addProperty("line_number", record.line.takeIf { it > 0 } ?: 1)
-            addProperty("hostname", "")
-        }
-        val payloads = JsonArray()
-        payloads.add(JsonObject().apply {
-            addProperty("type", "application_log")
-            add("origin", origin)
-            add("content", JsonObject().apply {
-                addProperty("value", record.message)
-                addProperty("level", "${record.channel}.${record.level}")
-                record.rest.toString().trim().takeIf { it.isNotEmpty() }?.let { addProperty("context", it) }
-            })
-        })
-        COLORS[record.level.lowercase()]?.let { color ->
-            payloads.add(JsonObject().apply {
-                addProperty("type", "color")
-                add("origin", origin)
-                add("content", JsonObject().apply { addProperty("color", color) })
-            })
-        }
-        project.service<DumpieProjectService>().receive(JsonObject().apply {
-            addProperty("uuid", UUID.randomUUID().toString())
-            add("payloads", payloads)
-            add("meta", JsonObject())
-        })
+        project.service<DumpieProjectService>().receive(request(file.path, record))
     }
 
     private fun countLines(file: File): Int = file.bufferedReader().use { r -> var n = 0; while (r.readLine() != null) n++; n }
@@ -147,11 +121,44 @@ class LogWatcher(private val project: Project) : Disposable {
         private const val MAX_COUNTED = 50L * 1024 * 1024
 
         // Monolog LineFormatter: [2026-10-23 12:00:00] local.ERROR: message {"context"} []
-        private val HEADER = Regex("""^\[(?:\d{4}-\d{2}-\d{2}[T ][^\]]*)] ([\w-]+)\.(\w+): (.*)$""")
+        internal val HEADER = Regex("""^\[(?:\d{4}-\d{2}-\d{2}[T ][^\]]*)] ([\w-]+)\.(\w+): (.*)$""")
 
         private val COLORS = mapOf(
             "emergency" to "red", "alert" to "red", "critical" to "red", "error" to "red",
             "warning" to "orange", "notice" to "blue", "debug" to "gray",
         )
+
+        /** A log record as a session request; [remote] names the server it was read from. */
+        internal fun request(path: String, record: Record, remote: String? = null, uuid: String = UUID.randomUUID().toString()): JsonObject {
+            val origin = JsonObject().apply {
+                addProperty("file", path)
+                addProperty("line_number", record.line.takeIf { it > 0 } ?: 1)
+                addProperty("hostname", "")
+                remote?.let { addProperty("remote", it) }
+            }
+            val payloads = JsonArray()
+            payloads.add(JsonObject().apply {
+                addProperty("type", "application_log")
+                add("origin", origin)
+                add("content", JsonObject().apply {
+                    addProperty("value", record.message)
+                    // A server line that is not a Monolog record has no level
+                    if (record.level.isNotEmpty()) addProperty("level", "${record.channel}.${record.level}")
+                    record.rest.toString().trim().takeIf { it.isNotEmpty() }?.let { addProperty("context", it) }
+                })
+            })
+            COLORS[record.level.lowercase()]?.let { color ->
+                payloads.add(JsonObject().apply {
+                    addProperty("type", "color")
+                    add("origin", origin)
+                    add("content", JsonObject().apply { addProperty("color", color) })
+                })
+            }
+            return JsonObject().apply {
+                addProperty("uuid", uuid)
+                add("payloads", payloads)
+                add("meta", JsonObject())
+            }
+        }
     }
 }

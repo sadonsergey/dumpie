@@ -1,0 +1,6 @@
+<idea-plugin>
+    <extensions defaultExtensionNs="com.intellij">
+        <projectService serviceInterface="dev.sadonsergey.dumpie.RemoteHosts"
+                        serviceImplementation="dev.sadonsergey.dumpie.SshConfigHosts"/>
+    </extensions>
+</idea-plugin>

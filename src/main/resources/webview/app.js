@@ -9,6 +9,7 @@
     const queryStats = document.getElementById('query-stats');
     const noMatch = document.getElementById('no-match');
     const pauseButton = document.getElementById('pause');
+    const remoteButton = document.getElementById('remote');
     const searchButton = document.getElementById('search');
     const pausedBar = document.getElementById('paused-bar');
     const pendingCount = document.getElementById('pending');
@@ -865,6 +866,7 @@
             + '<div class="entry-main">'
             + '<div class="entry-tags">'
             + (allProjects && source ? projectBadge(source) : '')
+            + (origin && origin.remote ? '<span class="entry-project entry-remote" title="Read from the server"><i></i>' + esc(origin.remote) + '</span>' : '')
             + '<span class="entry-label"></span></div>'
             + '<div class="entry-body"></div>'
             + '<div class="entry-meta">'
@@ -1222,19 +1224,70 @@
                 + '<span class="archive-restore">Restore</span></div>';
         }).join('') + '</div>' : '<div class="archive-empty muted">Nothing cleared yet. What Clear removes can be restored here.</div>');
         archivePanel.hidden = false;
-        placeArchive();
+        placeDropdown(archivePanel, document.getElementById('history'));
     }
 
-    // Under the history button, inside the panel; the caret points at the button
-    function placeArchive() {
-        const button = document.getElementById('history');
+    // Under its toolbar button, inside the panel; the caret points at the button
+    function placeDropdown(panel, button) {
         const center = button.offsetLeft + button.offsetWidth / 2;
-        const width = archivePanel.offsetWidth;
+        const width = panel.offsetWidth;
         const left = Math.max(8, Math.min(button.offsetLeft - 6, document.documentElement.clientWidth - width - 8));
-        archivePanel.style.setProperty('--archive-left', left + 'px');
-        archivePanel.style.setProperty('--archive-top', (button.offsetTop + button.offsetHeight + 9) + 'px');
-        archivePanel.style.setProperty('--caret-x', (center - left) + 'px');
+        panel.style.setProperty('--archive-left', left + 'px');
+        panel.style.setProperty('--archive-top', (button.offsetTop + button.offsetHeight + 9) + 'px');
+        panel.style.setProperty('--caret-x', (center - left) + 'px');
     }
+
+    // Servers of this tool window's project (Settings | Tools | Dumpie | Servers); null hides the button
+    const serverPanel = document.getElementById('servers');
+    let servers = null;
+
+    function remote(list) {
+        servers = list;
+        remoteButton.hidden = !list;
+        if (!list) {
+            serverPanel.hidden = true;
+            return;
+        }
+        const on = list.filter(function (s) { return s.state === 'on'; });
+        const state = on.length ? 'on' : list.some(function (s) { return s.state === 'connecting'; }) ? 'connecting' : 'off';
+        remoteButton.dataset.state = state;
+        remoteButton.classList.toggle('on', state !== 'off');
+        remoteButton.title = on.length ? 'Following ' + on.map(function (s) { return s.name; }).join(', ')
+            : 'Servers: follow their logs, ray() and dump()';
+        if (!serverPanel.hidden) renderServers();
+    }
+
+    function renderServers() {
+        serverPanel.innerHTML = '<div class="archive-title">Servers</div><div class="archive-list">' + servers.map(function (s) {
+            const note = s.problem || (s.state === 'on' ? 'Connected' : s.state === 'connecting' ? 'Connecting…' : 'Not connected');
+            const action = s.state === 'on' ? 'Disconnect' : s.state === 'connecting' ? 'Cancel' : 'Connect';
+            return '<div class="archive-item server-item" data-server="' + esc(s.id) + '" data-state="' + esc(s.state) + '"'
+                + (s.problem ? ' aria-disabled="true"' : '') + '><i class="server-dot"></i>'
+                + '<div class="archive-text"><b>' + esc(s.name) + '</b><span class="muted">' + esc(note) + '</span></div>'
+                + (s.problem ? '' : '<span class="archive-restore">' + action + '</span>') + '</div>';
+        }).join('') + '</div><div class="archive-item server-settings" data-settings="1">Configure servers…</div>';
+    }
+
+    remoteButton.addEventListener('click', function () {
+        if (!serverPanel.hidden) {
+            serverPanel.hidden = true;
+            return;
+        }
+        renderServers();
+        serverPanel.hidden = false;
+        placeDropdown(serverPanel, remoteButton);
+    });
+
+    // The menu stays open, so several servers can be switched on and their state is seen
+    serverPanel.addEventListener('click', function (e) {
+        if (e.target.closest('[data-settings]')) {
+            serverPanel.hidden = true;
+            post({ action: 'settings', own: true });
+            return;
+        }
+        const item = e.target.closest('[data-server]');
+        if (item && !item.hasAttribute('aria-disabled')) post({ action: 'remote', id: item.dataset.server });
+    });
 
     document.getElementById('history').addEventListener('click', function () {
         if (archivePanel.hidden) post({ action: 'archive' }); else archivePanel.hidden = true;
@@ -1250,6 +1303,7 @@
     // Any click elsewhere closes the list
     document.addEventListener('mousedown', function (e) {
         if (!archivePanel.hidden && !e.target.closest('#archive, #history')) archivePanel.hidden = true;
+        if (!serverPanel.hidden && !e.target.closest('#servers, #remote')) serverPanel.hidden = true;
     });
 
     // Closing a screen drops it with its entries; the IDE removes them from the session history too
@@ -1419,40 +1473,7 @@
         if (active) active.scrollIntoView({ block: 'nearest', inline: 'nearest' });
     }
 
-    // Off-screen JCEF applies a mouse wheel notch as one jump; animate those. Trackpads send many small pixel
-    // deltas that are smooth already, and inner scrollable blocks (long dumps, lists) scroll on their own first
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
-    let wheelTarget = null;
-    let wheelFrame = 0;
-
-    function scrollsInside(el, dy) {
-        for (; el && el !== feed; el = el.parentElement) {
-            if (el.scrollHeight <= el.clientHeight || !/auto|scroll/.test(getComputedStyle(el).overflowY)) continue;
-            if (dy < 0 ? el.scrollTop > 0 : el.scrollTop + el.clientHeight < el.scrollHeight - 1) return true;
-        }
-        return false;
-    }
-
-    function wheelStep() {
-        const diff = wheelTarget - feed.scrollTop;
-        if (Math.abs(diff) < 1) {
-            feed.scrollTop = wheelTarget;
-            wheelTarget = null;
-            wheelFrame = 0;
-            return;
-        }
-        feed.scrollTop += diff * 0.22;
-        wheelFrame = requestAnimationFrame(wheelStep);
-    }
-
-    feed.addEventListener('wheel', function (e) {
-        const dy = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY;
-        if (reducedMotion.matches || e.ctrlKey || e.deltaX || Math.abs(dy) < 40 || scrollsInside(e.target, dy)) return;
-        e.preventDefault();
-        const max = feed.scrollHeight - feed.clientHeight;
-        wheelTarget = Math.max(0, Math.min(max, (wheelTarget === null ? feed.scrollTop : wheelTarget) + dy));
-        if (!wheelFrame) wheelFrame = requestAnimationFrame(wheelStep);
-    }, { passive: false });
 
     // A click on a gutter icon in the editor: bring the entry into view, on whichever screen it is
     function reveal(uuid) {
@@ -1592,5 +1613,5 @@
         items.forEach(function (item) { receive(item.r, item.s); });
     }
 
-    window.dumpie = { receive: receive, receiveBatch: receiveBatch, theme: theme, options: options, sessions: sessions, reset: reset, status: status, reveal: reveal, command: command, archive: archive };
+    window.dumpie = { receive: receive, receiveBatch: receiveBatch, theme: theme, options: options, sessions: sessions, reset: reset, status: status, reveal: reveal, command: command, archive: archive, remote: remote };
 })();

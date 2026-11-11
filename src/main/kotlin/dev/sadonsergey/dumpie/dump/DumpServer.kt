@@ -164,7 +164,9 @@ class DumpServer : Disposable {
         return JsonObject().apply {
             addProperty("uuid", UUID.randomUUID().toString())
             add("payloads", payloads)
-            add("meta", JsonObject())
+            // dump($a, $b) sends one dump per argument, labelled 1, 2, ... or by name: one call for OutputMarkers
+            val argument = ((data.props["context"] as? Arr)?.items?.get("label") as? Str)?.value
+            add("meta", JsonObject().apply { argument?.let { addProperty(ARGUMENT_LABEL, it) } })
         }
     }
 
@@ -186,6 +188,7 @@ class DumpServer : Disposable {
     }
 
     companion object {
+        internal const val ARGUMENT_LABEL = "dumpie_argument_label"
         private const val RETRY_SECONDS = 5L
     }
 }

@@ -42,6 +42,9 @@ dependencies {
         // An installed IDE avoids the download; otherwise the version from gradle.properties is fetched
         if (platformLocalPath != null) local(platformLocalPath) else phpstorm(providers.gradleProperty("platformVersion").get())
         bundledPlugin("com.intellij.modules.jcef")
+        bundledPlugin("com.intellij.platform.vcs")
+        bundledModule("intellij.platform.vcs.core")
+        bundledPlugin("com.intellij.platform.ssh")
         testFramework(TestFrameworkType.Platform)
     }
 

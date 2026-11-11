@@ -36,7 +36,7 @@
         <span class="badge">Free and open source · PhpStorm &amp; WebStorm 2024.3+</span>
         <h1>PHP debug output right inside PhpStorm</h1>
         <p class="lead"><code>dump()</code>, <code>dd()</code>, log records, SQL queries, exceptions and <code>ray()</code> calls in a tool window
-            next to your code, each linked to the line that produced it.</p>
+            next to your code, each linked to the line that produced it. From your machine, or from a server over SSH.</p>
         <div class="cta">
             <a class="btn primary" href="https://plugins.jetbrains.com/plugin/35423-dumpie">Install from JetBrains Marketplace</a>
             <a class="btn" href="https://github.com/sadonsergey/dumpie">View on GitHub</a>
@@ -83,10 +83,32 @@ ray()-&gt;pause();</pre>
         <div class="feature">
             <div class="text">
                 <h3>From the code to its output</h3>
-                <p>Lines that sent output get an icon in the editor gutter. Hover it to see what they sent, click it to jump to the entry.
-                    And the other way round: every entry links to its file and line, Docker and Sail paths included.</p>
+                <p>The last value a line sent shows up at its end, in gray, like the debugger's inline values. An icon in the gutter marks
+                    the line: hover it to see everything it sent, click it to jump to the entry. And the other way round: every entry links
+                    to its file and line, Docker and Sail paths included.</p>
             </div>
-            <div class="media"><img src="marketplace/06-gutter.png" alt="Gutter icon with a tooltip and the revealed entry" loading="lazy" width="2560" height="1600"></div>
+            <div class="media"><img src="marketplace/06-gutter.png" alt="Inline values, a gutter icon with a tooltip and the revealed entry" loading="lazy" width="2560" height="1600"></div>
+        </div>
+
+        <div class="feature flip">
+            <div class="text">
+                <h3>Follow your servers over SSH</h3>
+                <p>Add servers from the IDE's SSH configurations with their log files, then switch them on from the server menu, several at once. New log lines arrive
+                    tagged with the server name: Monolog records from the level you choose, or every line, worker output and PHP errors included.</p>
+                <p>Calls of <code>ray()</code> and <code>dump()</code> on a server reach the IDE through the same SSH connection. Nothing
+                    connects on its own.</p>
+            </div>
+            <div class="media"><img src="marketplace/18-server.png" alt="The server's output in the tool window, and its settings" loading="lazy" width="2560" height="1600"></div>
+        </div>
+
+        <div class="feature">
+            <div class="text">
+                <h3>No dd() slips into a commit</h3>
+                <p>A commit that adds <code>dd()</code>, <code>dump()</code>, <code>ray()</code> or <code>var_dump()</code> stops and links
+                    to every call. Lines that were already there, comments and methods like <code>Yaml::dump()</code> do not count.
+                    Meant to keep it? <b>Commit Anyway</b>.</p>
+            </div>
+            <div class="media"><img src="marketplace/17-commit.png" alt="A commit with dd() stopped, and the list of debug calls" loading="lazy" width="2560" height="1600"></div>
         </div>
 
         <div class="feature flip">
@@ -191,7 +213,7 @@ ray()-&gt;pause();</pre>
             <div class="card"><h4>Copy text or Markdown</h4><p>Any entry goes to the clipboard as plain text or as fenced code blocks that keep highlighting in chats and issues.</p></div>
             <div class="card"><h4>Follows your IDE</h4><p>Light and dark themes, fonts, syntax colors and the time format come from the IDE.</p></div>
             <div class="card"><h4>Guided setup</h4><p>An empty tool window shows what a project is missing, with an <b>Add to .env</b> button.</p></div>
-            <div class="card"><h4>Local only</h4><p>Dumpie listens on <code>127.0.0.1</code>. Nothing leaves your machine.</p></div>
+            <div class="card"><h4>Local by default</h4><p>Dumpie listens on <code>127.0.0.1</code>, your output stays on your machine. A server is followed only when you press its button.</p></div>
         </div>
     </div>
 </section>
@@ -255,7 +277,7 @@ ray()-&gt;pause();</pre>
 <section id="settings">
     <div class="wrap">
         <h2>Settings</h2>
-        <p class="section-lead">Settings | Tools | Dumpie. Receivers, display and SQL options apply to every project, the last group to the open project only. Apply takes effect at once, no restart needed.</p>
+        <p class="section-lead">Settings | Tools | Dumpie. Receivers, display and SQL options apply to every project, the project and server groups to the open project only. Apply takes effect at once, no restart needed.</p>
         <div class="settings">
             <div class="set-col">
                 <div class="set-card">
@@ -264,14 +286,17 @@ ray()-&gt;pause();</pre>
                     <div class="opt"><div class="opt-head"><b>Pinned project and screen bars</b><span>On</span></div><p>Off lets the bars scroll away with the feed for more room.</p></div>
                     <div class="opt"><div class="opt-head"><b>White background in light themes</b><span>On</span></div><p>The feed matches the editor instead of the tool window gray.</p></div>
                     <div class="opt"><div class="opt-head"><b>Gutter icons</b><span>On</span></div><p>Marks the lines that sent output. Hover to preview, click to jump to the entry.</p></div>
+                    <div class="opt"><div class="opt-head"><b>Inline values</b><span>On</span></div><p>The last value of a line at its end, with <code>×N</code> when it ran N times.</p></div>
+                    <div class="opt"><div class="opt-head"><b>Commit check</b><span>On</span></div><p>Stops a commit that adds <code>dd()</code>, <code>dump()</code>, <code>ray()</code> or <code>var_dump()</code>.</p></div>
                     <div class="opt"><div class="opt-head"><b>Error mark on the icon</b><span>On</span></div><p>Exceptions and error logs while the window is hidden. Opening it scrolls to the last error.</p></div>
                     <div class="opt"><div class="opt-head"><b>Entries without a color are gray</b><span>On</span></div><p>The gray dot also finds plain dumps, info logs and <code>ray()</code> without a color.</p></div>
                 </div>
                 <div class="set-card">
-                    <h3>Receivers<small>All projects</small></h3>
-                    <div class="opt"><div class="opt-head"><b>spatie/ray clients</b><span>23517</span></div><p>Receives <code>ray()</code> over HTTP. If another app holds the port, pick another one and set <code>RAY_PORT</code> in the project.</p></div>
-                    <div class="opt"><div class="opt-head"><b>dump() / dd() server</b><span>9912</span></div><p>Receives VarDumper dumps. The project sends them with <code>VAR_DUMPER_FORMAT=server</code> and <code>VAR_DUMPER_SERVER</code>.</p></div>
-                    <p class="set-note">Both listen on <code>127.0.0.1</code> only. A busy port is retried every 5 seconds.</p>
+                    <h3>Servers (SSH)<small>Open project</small></h3>
+                    <div class="opt"><div class="opt-head"><b>Servers</b><span>None</span></div><p>Production, staging, a worker: each is one of the IDE's SSH configurations with a key pair or the SSH agent, since the system <code>ssh</code> cannot type a password. Every server has the options below.</p></div>
+                    <div class="opt"><div class="opt-head"><b>Log files on the server</b></div><p>Absolute paths, one per line, wildcards allowed. Lines written after connecting.</p></div>
+                    <div class="opt"><div class="opt-head"><b>Show</b><span>Every line</span></div><p>Every line, or Monolog records of any level, or from INFO to CRITICAL up.</p></div>
+                    <div class="opt"><div class="opt-head"><b>Forward ray() and dump()</b><span>On</span></div><p>The server's <code>127.0.0.1:23517</code> and <code>:9912</code> lead to this IDE while connected.</p></div>
                 </div>
             </div>
             <div class="set-col">
@@ -289,6 +314,12 @@ ray()-&gt;pause();</pre>
                     <div class="opt"><div class="opt-head"><b>Query totals in the toolbar</b><span>On</span></div><p>Count and total time of the screen, orange when something needs a look.</p></div>
                     <div class="opt"><div class="opt-head"><b>Repeated queries</b><span>On</span></div><p>The same statement with other values 3 or more times on one screen: a likely N+1.</p></div>
                     <div class="opt"><div class="opt-head"><b>Slow queries</b><span>100 ms</span></div><p>Anything slower is marked <b>Slow</b> and found by the red filter.</p></div>
+                </div>
+                <div class="set-card">
+                    <h3>Receivers<small>All projects</small></h3>
+                    <div class="opt"><div class="opt-head"><b>spatie/ray clients</b><span>23517</span></div><p>Receives <code>ray()</code> over HTTP. If another app holds the port, pick another one and set <code>RAY_PORT</code> in the project.</p></div>
+                    <div class="opt"><div class="opt-head"><b>dump() / dd() server</b><span>9912</span></div><p>Receives VarDumper dumps. The project sends them with <code>VAR_DUMPER_FORMAT=server</code> and <code>VAR_DUMPER_SERVER</code>.</p></div>
+                    <p class="set-note">Both listen on <code>127.0.0.1</code> only. A busy port is retried every 5 seconds.</p>
                 </div>
             </div>
         </div>

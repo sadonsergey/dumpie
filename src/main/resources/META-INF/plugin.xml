@@ -27,7 +27,14 @@
                 <code>pause()</code>, colors and screens.</li>
             <li><b>Exceptions</b> with the code around the failing line; vendor frames are folded.</li>
             <li><b>Jump to code</b>: click <code>File.php:42</code>. Docker and Sail paths are mapped to your project.
-                And back: an icon in the editor gutter marks the lines that sent output.</li>
+                And back: an icon in the editor gutter marks the lines that sent output, and the last value a line sent
+                is shown at its end.</li>
+            <li><b>Follow your servers over SSH</b>: add servers from the IDE's SSH configurations with their log files,
+                then switch them on from the server menu in the toolbar, several at once. New log lines, worker output and
+                PHP errors arrive tagged with the server name; <code>ray()</code> and <code>dump()</code> on a server can
+                reach the IDE through the same connection.</li>
+            <li><b>Commit check</b>: a commit that adds <code>dd()</code>, <code>dump()</code>, <code>ray()</code> or
+                <code>var_dump()</code> stops with a link to every call, Commit Anyway is one click away.</li>
             <li><b>SQL insights</b>: repeated queries (possible N+1) and slow ones are marked, with totals per screen.</li>
             <li><b>Copy as code</b>: a dump becomes a PHP array ready to paste into a test or a seeder, a query copies as
                 SQL with its values in place.</li>
@@ -54,7 +61,8 @@
 
         <p>Screenshots and docs: <a href="https://sadonsergey.github.io/dumpie/">sadonsergey.github.io/dumpie</a>.</p>
 
-        <p>Dumpie listens on <code>127.0.0.1</code> only, so nothing leaves your machine. Free and open source (MIT).
+        <p>Dumpie listens on <code>127.0.0.1</code> only, so your output never leaves your machine; it connects to a
+        server only when you switch it on in the server menu. Free and open source (MIT).
         If Dumpie saves you time, please <a href="https://plugins.jetbrains.com/plugin/35423-dumpie/reviews">leave a review</a>: it helps others find it.
         You can also <a href="https://boosty.to/sadonsergey/donate">support it on Boosty</a>.</p>
 
@@ -63,6 +71,23 @@
     ]]></description>
 
     <change-notes><![CDATA[
+        <p><b>0.3.0</b></p>
+        <ul>
+            <li>Inline values: the last output of a line is shown at its end in the editor, like the debugger's inline
+                values, with the number of times it ran; the values of one <code>dd($a, $b)</code> call are shown
+                together.</li>
+            <li>Commit check: a commit that adds <code>dump()</code>, <code>dd()</code>, <code>ray()</code> or
+                <code>var_dump()</code> calls stops with a link to them and Commit Anyway.</li>
+            <li>Follow servers over SSH: add servers from the IDE's SSH configurations with their log files in
+                Settings | Tools | Dumpie, then switch them on from the new server menu in the toolbar, several at once.
+                Their log records arrive marked with the server name, filtered by level or as every line of the files
+                (worker output, PHP errors); <code>ray()</code> and <code>dump()</code> calls on a server can be
+                forwarded to the IDE as well.</li>
+            <li>Mouse wheel scrolling in the tool window is native again.</li>
+            <li>Checked with PhpStorm and WebStorm 2026.3.</li>
+            <li>The new options can be turned off in Settings | Tools | Dumpie.</li>
+        </ul>
+
         <p><b>0.2.2</b></p>
         <ul>
             <li>Copy as code: every dump, query and JSON block has its own copy button. A dump becomes a PHP array ready
@@ -113,6 +138,9 @@
     <depends>com.intellij.modules.platform</depends>
     <!-- JCEF is a separate plugin since 2025.3.1; on older builds it is part of the platform and this is skipped -->
     <depends optional="true" config-file="dumpie-jcef.xml">com.intellij.modules.jcef</depends>
+    <!-- Separate plugins since 2026.3, part of the platform before: the commit check and the server connection -->
+    <depends optional="true" config-file="dumpie-vcs.xml">com.intellij.modules.vcs</depends>
+    <depends optional="true" config-file="dumpie-ssh.xml">com.intellij.modules.ssh</depends>
 
     <extensions defaultExtensionNs="com.intellij">
         <toolWindow id="Dumpie" anchor="right" icon="/icons/dumpieToolWindow.svg"

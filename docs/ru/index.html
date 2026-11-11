@@ -36,7 +36,7 @@
         <span class="badge">Бесплатно и open source · PhpStorm и WebStorm 2024.3+</span>
         <h1>Отладочный вывод PHP прямо в PhpStorm</h1>
         <p class="lead"><code>dump()</code>, <code>dd()</code>, записи логов, SQL-запросы, исключения и вызовы <code>ray()</code> в окне рядом
-            с кодом. У каждой записи есть ссылка на строку, которая её отправила.</p>
+            с кодом. У каждой записи есть ссылка на строку, которая её отправила. С вашей машины или с сервера по SSH.</p>
         <div class="cta">
             <a class="btn primary" href="https://plugins.jetbrains.com/plugin/35423-dumpie">Установить из JetBrains Marketplace</a>
             <a class="btn" href="https://github.com/sadonsergey/dumpie">Открыть на GitHub</a>
@@ -83,10 +83,32 @@ ray()-&gt;pause();</pre>
         <div class="feature">
             <div class="text">
                 <h3>От кода к его выводу</h3>
-                <p>Строки, которые что-то вывели, получают иконку в гаттере редактора. Наведите на неё, чтобы увидеть, что именно, или кликните,
-                    чтобы перейти к записи. И в обратную сторону: каждая запись ссылается на свой файл и строку, пути из Docker и Sail тоже.</p>
+                <p>Последнее значение, которое отправила строка, видно серым прямо в её конце, как значения в отладчике. Иконка в гаттере
+                    отмечает строку: наведите на неё, чтобы увидеть всё, что она отправила, или кликните, чтобы перейти к записи. И в обратную
+                    сторону: каждая запись ссылается на свой файл и строку, пути из Docker и Sail тоже.</p>
             </div>
-            <div class="media"><img src="../marketplace/06-gutter.png" alt="Иконка в гаттере с подсказкой и найденная запись" loading="lazy" width="2560" height="1600"></div>
+            <div class="media"><img src="../marketplace/06-gutter.png" alt="Значения в конце строк, иконка в гаттере с подсказкой и найденная запись" loading="lazy" width="2560" height="1600"></div>
+        </div>
+
+        <div class="feature flip">
+            <div class="text">
+                <h3>Логи серверов по SSH</h3>
+                <p>Добавьте серверы из SSH-конфигураций IDE с их файлами логов и включайте их в меню серверов, хоть несколько сразу. Новые строки приходят с именем
+                    сервера: записи Monolog от выбранного уровня или вообще каждая строка, включая вывод воркеров и ошибки PHP.</p>
+                <p>Вызовы <code>ray()</code> и <code>dump()</code> на сервере тоже доходят до IDE через то же SSH-соединение. Само ничего
+                    не подключается.</p>
+            </div>
+            <div class="media"><img src="../marketplace/18-server.png" alt="Вывод сервера в окне Dumpie и его настройки" loading="lazy" width="2560" height="1600"></div>
+        </div>
+
+        <div class="feature">
+            <div class="text">
+                <h3>dd() не уедет в коммит</h3>
+                <p>Коммит, который добавляет <code>dd()</code>, <code>dump()</code>, <code>ray()</code> или <code>var_dump()</code>,
+                    останавливается со ссылкой на каждый вызов. Строки, которые уже были в файле, комментарии и методы вроде
+                    <code>Yaml::dump()</code> не считаются. Так и задумано? <b>Commit Anyway</b>.</p>
+            </div>
+            <div class="media"><img src="../marketplace/17-commit.png" alt="Остановленный коммит с dd() и список отладочных вызовов" loading="lazy" width="2560" height="1600"></div>
         </div>
 
         <div class="feature flip">
@@ -191,7 +213,7 @@ ray()-&gt;pause();</pre>
             <div class="card"><h4>Текст или Markdown</h4><p>Любая запись копируется обычным текстом или блоками кода, которые сохраняют подсветку в чатах и задачах.</p></div>
             <div class="card"><h4>Как ваша IDE</h4><p>Светлая и тёмная тема, шрифты, цвета синтаксиса и формат времени берутся из IDE.</p></div>
             <div class="card"><h4>Подсказки при настройке</h4><p>Пустое окно показывает, чего не хватает проекту, и предлагает кнопку <b>Add to .env</b>.</p></div>
-            <div class="card"><h4>Только локально</h4><p>Dumpie слушает <code>127.0.0.1</code>. Ничего не уходит с вашей машины.</p></div>
+            <div class="card"><h4>Локально по умолчанию</h4><p>Dumpie слушает <code>127.0.0.1</code>, ваш вывод не уходит с машины. К серверу подключается, только когда вы нажмёте его кнопку.</p></div>
         </div>
     </div>
 </section>
@@ -255,7 +277,7 @@ ray()-&gt;pause();</pre>
 <section id="settings">
     <div class="wrap">
         <h2>Настройки</h2>
-        <p class="section-lead">Settings | Tools | Dumpie. Приёмники, отображение и SQL действуют на все проекты, последняя группа — только на открытый проект. Apply применяет изменения сразу, без перезапуска IDE.</p>
+        <p class="section-lead">Settings | Tools | Dumpie. Приёмники, отображение и SQL действуют на все проекты, группы проекта и сервера — только на открытый проект. Apply применяет изменения сразу, без перезапуска IDE.</p>
         <div class="settings">
             <div class="set-col">
                 <div class="set-card">
@@ -264,14 +286,17 @@ ray()-&gt;pause();</pre>
                     <div class="opt"><div class="opt-head"><b>Закреплённые панели проектов и экранов</b><span>Вкл.</span></div><p>Если выключить, панели уезжают вместе с лентой и освобождают место.</p></div>
                     <div class="opt"><div class="opt-head"><b>Белый фон в светлых темах</b><span>Вкл.</span></div><p>Лента в цвет редактора, а не серого фона окна.</p></div>
                     <div class="opt"><div class="opt-head"><b>Иконки в гаттере</b><span>Вкл.</span></div><p>Отмечают строки, которые что-то вывели. Наведите, чтобы посмотреть, кликните, чтобы перейти к записи.</p></div>
+                    <div class="opt"><div class="opt-head"><b>Значения в строке</b><span>Вкл.</span></div><p>Последнее значение строки в её конце, с <code>×N</code>, если она сработала N раз.</p></div>
+                    <div class="opt"><div class="opt-head"><b>Проверка коммита</b><span>Вкл.</span></div><p>Останавливает коммит, который добавляет <code>dd()</code>, <code>dump()</code>, <code>ray()</code> или <code>var_dump()</code>.</p></div>
                     <div class="opt"><div class="opt-head"><b>Метка ошибок на иконке</b><span>Вкл.</span></div><p>Исключения и логи уровня error, пока окно скрыто. При открытии окно прокручивается к последней ошибке.</p></div>
                     <div class="opt"><div class="opt-head"><b>Записи без цвета считаются серыми</b><span>Вкл.</span></div><p>Серый кружок находит и обычные дампы, info-логи и <code>ray()</code> без цвета.</p></div>
                 </div>
                 <div class="set-card">
-                    <h3>Приёмники<small>Все проекты</small></h3>
-                    <div class="opt"><div class="opt-head"><b>spatie/ray clients</b><span>23517</span></div><p>Принимает <code>ray()</code> по HTTP. Если порт занят другим приложением, выберите другой и укажите его в проекте в <code>RAY_PORT</code>.</p></div>
-                    <div class="opt"><div class="opt-head"><b>dump() / dd() server</b><span>9912</span></div><p>Принимает дампы VarDumper. Проект отправляет их с <code>VAR_DUMPER_FORMAT=server</code> и <code>VAR_DUMPER_SERVER</code>.</p></div>
-                    <p class="set-note">Оба слушают только <code>127.0.0.1</code>. Занятый порт проверяется заново каждые 5 секунд.</p>
+                    <h3>Серверы (SSH)<small>Открытый проект</small></h3>
+                    <div class="opt"><div class="opt-head"><b>Серверы</b><span>Нет</span></div><p>Прод, стейджинг, воркер: каждый сервер — это SSH-конфигурация IDE с ключом или SSH-агентом, потому что системный <code>ssh</code> не умеет вводить пароль. У каждого сервера свои настройки ниже.</p></div>
+                    <div class="opt"><div class="opt-head"><b>Файлы логов на сервере</b></div><p>Абсолютные пути, по одному в строке, можно с масками. Показываются строки, записанные после подключения.</p></div>
+                    <div class="opt"><div class="opt-head"><b>Show</b><span>Every line</span></div><p>Каждая строка или записи Monolog любого уровня, или от INFO до CRITICAL и выше.</p></div>
+                    <div class="opt"><div class="opt-head"><b>Проброс ray() и dump()</b><span>Вкл.</span></div><p>Пока есть соединение, <code>127.0.0.1:23517</code> и <code>:9912</code> на сервере ведут в эту IDE.</p></div>
                 </div>
             </div>
             <div class="set-col">
@@ -289,6 +314,12 @@ ray()-&gt;pause();</pre>
                     <div class="opt"><div class="opt-head"><b>Итоги запросов в тулбаре</b><span>Вкл.</span></div><p>Число запросов экрана и их общее время. Становится оранжевым, если есть на что посмотреть.</p></div>
                     <div class="opt"><div class="opt-head"><b>Повторяющиеся запросы</b><span>Вкл.</span></div><p>Один и тот же запрос с другими значениями 3 раза и больше на одном экране: похоже на N+1.</p></div>
                     <div class="opt"><div class="opt-head"><b>Медленные запросы</b><span>100 мс</span></div><p>Всё, что дольше, помечается <b>Slow</b> и находится красным фильтром.</p></div>
+                </div>
+                <div class="set-card">
+                    <h3>Приёмники<small>Все проекты</small></h3>
+                    <div class="opt"><div class="opt-head"><b>spatie/ray clients</b><span>23517</span></div><p>Принимает <code>ray()</code> по HTTP. Если порт занят другим приложением, выберите другой и укажите его в проекте в <code>RAY_PORT</code>.</p></div>
+                    <div class="opt"><div class="opt-head"><b>dump() / dd() server</b><span>9912</span></div><p>Принимает дампы VarDumper. Проект отправляет их с <code>VAR_DUMPER_FORMAT=server</code> и <code>VAR_DUMPER_SERVER</code>.</p></div>
+                    <p class="set-note">Оба слушают только <code>127.0.0.1</code>. Занятый порт проверяется заново каждые 5 секунд.</p>
                 </div>
             </div>
         </div>

@@ -33,6 +33,7 @@ import com.intellij.util.ui.UIUtil
 import dev.sadonsergey.dumpie.DumpieProjectService
 import dev.sadonsergey.dumpie.FileResolver
 import dev.sadonsergey.dumpie.RayServer
+import dev.sadonsergey.dumpie.RemoteConnection
 import dev.sadonsergey.dumpie.settings.DumpieConfigurable
 import dev.sadonsergey.dumpie.settings.DumpieSettings
 import dev.sadonsergey.dumpie.settings.SetupGuide
@@ -107,6 +108,7 @@ class DumpiePanel(private val project: Project, parent: Disposable) {
                 applyTheme()
                 applyOptions()
                 show(viewed)
+                pushRemote()
                 loaded = true
                 pendingReveal?.let {
                     pendingReveal = null
@@ -285,6 +287,26 @@ class DumpiePanel(private val project: Project, parent: Disposable) {
         }
     }
 
+    /** The server menu of this panel's project: the button is hidden without configured servers. */
+    private fun pushRemote() {
+        ApplicationManager.getApplication().executeOnPooledThread {
+            if (project.isDisposed) return@executeOnPooledThread
+            val servers = project.service<RemoteConnection>().servers()?.takeIf { it.isNotEmpty() }?.let { list ->
+                JsonArray().apply {
+                    list.forEach { server ->
+                        add(JsonObject().apply {
+                            addProperty("id", server.id)
+                            addProperty("name", server.name)
+                            addProperty("state", server.state.name.lowercase())
+                            server.problem?.let { addProperty("problem", it) }
+                        })
+                    }
+                }
+            }
+            execute("window.dumpie && window.dumpie.remote(${servers ?: "null"});")
+        }
+    }
+
     /** Sends the list of sessions to the switcher in the page: all projects first, then each open project. */
     private fun pushSessions(closing: Project? = null) {
         val sessions = JsonArray()
@@ -322,6 +344,9 @@ class DumpiePanel(private val project: Project, parent: Disposable) {
         fun reveal(project: Project, uuid: String) = panels.firstOrNull { it.project == project }?.reveal(uuid)
 
         fun exists(project: Project) = panels.any { it.project == project }
+
+        /** The server connection of [project] changed its state or settings. */
+        fun remoteChanged(project: Project) = panels.filter { it.project == project }.forEach { it.pushRemote() }
 
         /** A keyboard action (see DumpieActions): clearAll, clearScreen, newScreen, pause, search, nextScreen, previousScreen. */
         fun command(project: Project, name: String) =
@@ -402,9 +427,14 @@ class DumpiePanel(private val project: Project, parent: Disposable) {
             "openText" -> msg.str("text")?.let { text -> openInEditor(text, msg.str("lang").orEmpty(), msg.str("title").orEmpty()) }
             "addEnv" -> ApplicationManager.getApplication().invokeLater({ SetupGuide.addToEnv(viewed ?: project); pushStatus() }, project.disposed)
             "settings" -> ApplicationManager.getApplication().invokeLater({
-                ShowSettingsUtil.getInstance().showSettingsDialog(viewed ?: project, DumpieConfigurable::class.java)
+                // own: the server menu belongs to this window's project, not to the session it shows
+                val target = if (msg.get("own")?.asBoolean == true) project else viewed ?: project
+                ShowSettingsUtil.getInstance().showSettingsDialog(target, DumpieConfigurable::class.java)
             }, project.disposed)
             "refresh" -> pushStatus()
+            "remote" -> msg.str("id")?.let { id ->
+                ApplicationManager.getApplication().executeOnPooledThread { project.service<RemoteConnection>().toggle(id) }
+            }
             "newScreen" -> (viewed ?: project).service<DumpieProjectService>().receive(newScreenRequest())
             "removeRequests" -> {
                 val uuids = (msg.get("uuids") as? JsonArray)?.mapNotNull { it.takeIf { e -> e.isJsonPrimitive }?.asString }?.toSet() ?: return

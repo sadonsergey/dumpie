@@ -58,6 +58,7 @@ its own session and delivers it to the window that has the project open.
 - [Features](#features)
 - [Installation](#installation)
 - [Quick start](#quick-start)
+- [Following a server](#following-a-server)
 - [Using the tool window](#using-the-tool-window)
 - [Settings](#settings)
 - [Troubleshooting](#troubleshooting)
@@ -76,7 +77,13 @@ its own session and delivers it to the window that has the project open.
 - **Works with `spatie/ray`.** Projects that already use `spatie/ray` or `spatie/laravel-ray` work as they are:
   tables, queries, events, jobs, mails, models, exceptions, measurements, `pause()`, colors, labels and screens.
 - **Jump to code.** Every entry links to its file and line. Docker paths such as `/var/www/html/app/...` are matched
-  to your project automatically. And back: an icon in the editor gutter marks the lines that sent output.
+  to your project automatically. And back: an icon in the editor gutter marks the lines that sent output, and the
+  last value a line sent is shown at its end, like the debugger's inline values.
+- **Follow your servers.** Add servers from the IDE's SSH configurations with the log files on them, then switch them
+  on from the server menu, several at once: new log lines arrive tagged with the server name. `ray()` and `dump()` on
+  a server can reach the IDE through the same SSH connection. See [Following a server](#following-a-server).
+- **No debug calls in commits.** A commit that adds `dd()`, `dump()`, `ray()` or `var_dump()` stops with a link to
+  every call; **Commit Anyway** is one click away.
 - **SQL insights.** Repeated queries (possible N+1) and slow queries are marked; the toolbar shows how many queries a
   screen ran and their total time.
 - **One session per project, several IDEs at once.** See [above](#many-projects-many-ides-nothing-mixes-up).
@@ -86,12 +93,13 @@ its own session and delivers it to the window that has the project open.
   collapse entries, copy any entry as a Markdown code block or open it in an editor tab.
 - **Nothing lost.** Whatever Clear removes goes to an archive and can be restored to its project.
 - **Follows the IDE.** Light and dark themes, UI and editor fonts come from your IDE settings.
-- **Local only.** Dumpie listens on `127.0.0.1`; nothing leaves your machine.
+- **Local by default.** Dumpie listens on `127.0.0.1`; your output never leaves your machine. It connects to a
+  server only when you switch it on in the server menu, with your own SSH configuration.
 
 ## Installation
 
 Requires **PhpStorm 2024.3 or newer**. Dumpie also installs in **WebStorm 2024.3 or newer**: every build is checked
-with the JetBrains Plugin Verifier against PhpStorm and WebStorm 2024.3–2026.2.
+with the JetBrains Plugin Verifier against PhpStorm and WebStorm 2024.3–2026.3.
 
 1. Open **Settings | Plugins | Marketplace**, search for **Dumpie** and press **Install**, or install it from its
    [JetBrains Marketplace page](https://plugins.jetbrains.com/plugin/35423-dumpie).
@@ -167,6 +175,49 @@ RAY_HOST=host.docker.internal   # spatie/laravel-ray, read by the published conf
 
 File links work without extra setup: a container path is matched to the project by its longest existing suffix.
 
+## Following a server
+
+Watch what a staging or production server writes, without opening a terminal: its log files, and optionally the
+`ray()` and `dump()` calls it makes.
+
+![The server menu, a server's output in the tool window and the Servers settings](docs/marketplace/18-server.png)
+
+1. **An SSH configuration.** Dumpie uses the configurations of **Settings | Tools | SSH Configurations**. It connects
+   with the system `ssh` client and cannot type a password, so the configuration needs **Key pair** or **OpenSSH
+   config and authentication agent**. A key with a passphrase has to be in the agent (`ssh-add`). Host aliases from
+   `~/.ssh/config`, `ProxyJump` included, work as they do in a terminal.
+2. **The servers of the project.** In **Settings | Tools | Dumpie**, group **Servers (SSH)**, press **+**, choose the
+   configuration and list the log files on the server: absolute paths, one per line, wildcards allowed
+   (`/var/www/app/storage/logs/*.log`). A project can have several servers, such as production and staging, or a web
+   and a worker server, each with its own files.
+3. **Connect.** The server button in the Dumpie toolbar opens the server menu: click a server to connect, click it
+   again to disconnect. Several servers can be followed at once. The button's dot blinks while connecting and turns
+   green when a server is followed. Dumpie never connects on its own, and the connections end with the IDE.
+
+Every entry from the server carries its name. **Show** decides what arrives:
+
+- **Every line** (default): log records and everything else the files contain, such as queue worker output and PHP
+  errors. A PHP stack trace stays in one entry.
+- **Log records of any level**, or **INFO / NOTICE / WARNING / ERROR / CRITICAL and above**: only Monolog records
+  (`[2026-11-10 12:00:00] production.ERROR: ...`) of that level and higher, each with its stack trace.
+
+Only lines written after connecting are shown. Wildcards are expanded when the connection starts: a file created
+later, such as tomorrow's daily log, is followed after you reconnect.
+
+**`ray()` and `dump()` on the server.** With **Forward ray() and dump() calls on the server to this IDE** on, the
+server's ports `127.0.0.1:23517` and `127.0.0.1:9912` lead to this IDE while it is connected (SSH remote port
+forwarding). Nothing else on the server's network can reach them. The server then sends as it would on your machine:
+
+```dotenv
+RAY_HOST=127.0.0.1   # spatie/laravel-ray, read by the published config/ray.php
+VAR_DUMPER_FORMAT=server
+VAR_DUMPER_SERVER=127.0.0.1:9912
+```
+
+`spatie/ray` is usually a dev dependency, so it has to be installed and enabled on the server for this. Only one
+connection at a time can take a port on a server: when another IDE already forwards it, Dumpie says so and keeps
+following the logs.
+
 ## Using the tool window
 
 ![Exception with code snippet, and the feed filtered to errors and warnings](docs/marketplace/04-errors.png)
@@ -198,10 +249,14 @@ The panel follows the IDE theme and fonts:
   **Restore** puts it back into the project it came from.
 - **Gutter icons**: lines that produced output get a Dumpie icon in the editor gutter. Hover it to see what the line
   sent, click it to jump to the entry.
+- **Inline values**: the end of such a line shows the last value it sent in gray, `×3` when it sent three times. The
+  values of one `dd($a, $b)` call are shown together, separated by commas.
+- **Servers**: the server button appears once the project has a server in the settings and opens the menu of its
+  servers, see [Following a server](#following-a-server).
 - **SQL**: queries that ran 3 or more times with different values are marked **Repeated** (possible N+1), queries over
   the threshold (100 ms by default) are marked **Slow**.
 
-![Gutter icons: hover shows what a line sent, a click jumps to the entry](docs/marketplace/06-gutter.png)
+![Inline values and gutter icons: hover shows what a line sent, a click jumps to the entry](docs/marketplace/06-gutter.png)
 
 ![SQL insights: repeated and slow queries](docs/marketplace/05-sql.png)
 
@@ -216,6 +271,19 @@ The panel follows the IDE theme and fonts:
 ![A red mark on the tool window icon, and the error in view after opening it](docs/marketplace/14-badge.png)
 
 ![The tool window at three widths](docs/marketplace/15-narrow.png)
+
+### Commit check
+
+![A commit with dd() stops with a link to the call](docs/marketplace/17-commit.png)
+
+Before a commit, Dumpie looks at the lines the commit adds and stops it when they call `dd()`, `ddd()`, `dump()`,
+`ray()`, `rd()`, `var_dump()`, or `->dump()` / `->dd()` (collections, query builders). The commit view shows the first
+call; **Show** opens it, **Show all** lists every one, **Commit Anyway** commits as it is.
+
+- Checked: PHP, Blade, Twig and JavaScript / TypeScript / Vue files. `vendor` and `node_modules` are skipped.
+- Not counted: lines that were already in the file, comments, methods such as `$dumper->dump($data)` or
+  `Yaml::dump()`, and the definition of your own `function dump()`.
+- Turn it off with **Warn before committing dump(), dd() and ray() calls** in the settings.
 
 ### Keyboard shortcuts
 
@@ -235,12 +303,12 @@ They work while the Dumpie tool window has focus, so ⌘K still commits in the e
 
 ## Settings
 
-Open **Settings | Tools | Dumpie**. The page has four groups:
+Open **Settings | Tools | Dumpie**. The page has five groups:
 
 - **Receivers**, **Display** and **SQL queries** apply to every project in the IDE. They are stored in `dumpie.xml`
   in the IDE configuration directory.
-- **This project** applies to the open project only. It is stored in `.idea/workspace.xml`, so it is not shared
-  through version control.
+- **This project** and **Servers (SSH)** apply to the open project only. They are stored in `.idea/workspace.xml`, so
+  they are not shared through version control.
 
 **Apply** takes effect right away: the receivers and the log watcher restart and open tool windows pick up the new
 options. No IDE restart is needed.
@@ -264,6 +332,8 @@ forwards output to the others.
 | **Keep the project and screen bars visible while scrolling** | On | The project chips and screen tabs stay under the toolbar. Off: they scroll away with the feed and leave more room for entries. |
 | **Use the editor background (white) in light themes** | On | In light themes the feed uses the editor's background. Off: the tool window background. Dark themes are not affected. |
 | **Show an icon in the editor gutter on lines that produced output** | On | Marks lines that sent output with an icon. Hover it to see what the line sent, click it to jump to the entry. Turning it off also removes the icons already shown. |
+| **Show the last output at the end of its line in the editor** | On | Shows the last value a line sent after its end, in gray, with `×N` when the line sent N times. Up to 80 characters. |
+| **Warn before committing dump(), dd() and ray() calls** | On | Stops a commit whose added lines call debug helpers, see [Commit check](#commit-check). |
 | **Mark the tool window icon when errors arrive while it is hidden** | On | Exceptions and log records of level error, critical, alert or emergency put a red mark on the tool window icon; its tooltip counts them. Showing the tool window clears the mark and scrolls to the last error. |
 | **Treat entries without a color as gray in the color filter** | On | The gray dot also finds entries that have no color: plain `dump()` output, info log records, `ray()` calls without a color. Off: gray finds only `ray()->gray()` and debug log records. |
 
@@ -292,6 +362,22 @@ directories. After that your changes are kept; **Detect Again** repeats the insp
 Log records are colored by level: emergency, alert, critical and error in red, warning in orange, notice in blue, debug
 in gray. Info records have no color.
 
+### Servers (SSH)
+
+The servers this project's tool window can follow, see [Following a server](#following-a-server). The group is shown
+when the IDE has SSH support, which PhpStorm and WebStorm bundle. **+**, **−** and **Edit** (or a double click) manage
+the list; each server has these settings:
+
+| Setting | Default | What it does |
+|---|---|---|
+| **SSH configuration** | The first one not in the list | One of **Settings \| Tools \| SSH Configurations**, each can be in the list once. It needs **Key pair** or **OpenSSH config and authentication agent**: Dumpie connects with the system `ssh` client, which cannot ask for a password. |
+| **Log files on the server** | Empty | Absolute paths, one per line, wildcards allowed. Only lines written after connecting are shown. |
+| **Show** | Every line | **Every line** also shows what is not a log record: worker output, PHP errors, other formats. The other choices show Monolog records only: of any level, or from INFO, NOTICE, WARNING, ERROR or CRITICAL up. |
+| **Forward ray() and dump() calls on the server to this IDE** | On | While connected, the server's `127.0.0.1` ports of the receivers (`23517` and `9912` by default) lead to this IDE. |
+
+Changes apply when you press **Apply**: a connected server whose settings changed reconnects, a removed one
+disconnects, the others keep running.
+
 ### Remapping the shortcuts
 
 The shortcuts of the tool window are actions in **Tools | Dumpie** and can be remapped in **Settings | Keymap**
@@ -309,6 +395,17 @@ The shortcuts of the tool window are actions in **Tools | Dumpie** and can be re
   configuration and, for Docker, `VAR_DUMPER_SERVER`.
 - **The tool window stays empty**: make sure a project is open in the IDE (receivers start with the first project)
   and that the source is enabled under **This project**.
+- **"… uses a password"** when connecting to a server: switch its SSH configuration to **Key pair** or **OpenSSH
+  config and authentication agent**.
+- **"Disconnected from …: Permission denied"**: the system `ssh` could not log in without a password. Check that
+  `ssh user@host` works in a terminal without a prompt; add a key with a passphrase to the agent with `ssh-add`.
+- **"Port 23517 is taken on …"**: another connection already forwards that port, often another IDE following the
+  same server. The logs keep coming; `ray()` and `dump()` on the server do not reach this IDE.
+- **"Log file not found on …"**: check the path in **Servers (SSH)**. The other files are still followed.
+- **A new daily log does not show up**: wildcards are expanded when the connection starts. Disconnect the server in
+  the server menu and connect it again.
+- **"Unknown server" in the server menu**: its SSH configuration was deleted. Edit the server in **Servers (SSH)** and
+  choose another configuration, or remove it.
 
 Still stuck? [Open an issue](https://github.com/sadonsergey/dumpie/issues) and describe your setup.
 

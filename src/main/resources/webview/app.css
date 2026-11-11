@@ -136,6 +136,13 @@ button.icon:hover, button.icon.on { background: var(--hover); color: var(--fg); 
 button.icon svg { width: 15px; height: 15px; fill: currentColor; }
 /* 16px icons in 26px buttons: with the toolbar padding they start at --edge */
 .toolbar button.icon svg { width: 16px; height: 16px; }
+#remote[hidden] { display: none; }
+/* Server button: a dot shows the connection */
+#remote { position: relative; }
+#remote::after { content: ''; position: absolute; right: 3px; bottom: 3px; width: 6px; height: 6px; border-radius: 50%; }
+#remote[data-state="on"]::after { background: var(--green); box-shadow: 0 0 0 1.5px var(--bg); }
+#remote[data-state="connecting"]::after { background: var(--muted); animation: remote-pulse .8s ease-in-out infinite alternate; }
+@keyframes remote-pulse { from { opacity: .25; } to { opacity: 1; } }
 #pause .i-play, #pause.on .i-pause { display: none; }
 #pause.on .i-play { display: inline; }
 #pause.on { color: var(--orange); }
@@ -181,6 +188,14 @@ button.icon svg { width: 15px; height: 15px; fill: currentColor; }
 .archive-restore { flex: none; font-size: .8em; color: var(--muted); }
 .archive-item:hover .archive-restore { color: var(--accent); }
 .archive-empty { padding: 2px 8px 6px; font-size: .88em; }
+/* Server menu: the same dropdown, a dot per server shows its connection; SSH configuration names are long */
+#servers { width: min(360px, calc(100% - 20px)); }
+.server-dot { flex: none; width: 7px; height: 7px; border-radius: 50%; box-shadow: inset 0 0 0 1.5px var(--muted); }
+.server-item[data-state="on"] .server-dot { background: var(--green); box-shadow: none; }
+.server-item[data-state="connecting"] .server-dot { background: var(--muted); box-shadow: none; animation: remote-pulse .8s ease-in-out infinite alternate; }
+.server-item[aria-disabled] { cursor: default; opacity: .6; }
+.server-item[aria-disabled]:hover { background: none; }
+.server-settings { margin-top: 4px; padding-top: 7px; border-top: 1px solid var(--box-border); border-radius: 0 0 5px 5px; font-size: .92em; }
 
 /* SQL insights: repeated statements (possible N+1) and slow queries */
 .query-flag {
@@ -722,6 +737,8 @@ pre.sf-dump .sf-dump-ref, pre.sf-dump .sf-dump-ellipsis, pre.sf-dump a { color: 
     border-radius: 9px;
 }
 .entry-project i { width: 7px; height: 7px; border-radius: 50%; background: var(--pc); }
+/* Read from a server over SSH */
+.entry-remote { --pc: var(--accent); }
 
 /* Dumps rendered by the IDE carry no VarDumper stylesheet */
 pre.dumpie-dump .sf-dump-compact { display: none; }
